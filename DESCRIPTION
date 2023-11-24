@@ -1,12 +1,22 @@
 Package: pwSEM
-Title: What the Package Does (One Line, Title Case)
+Title: Piecewise structural equation modelling
 Version: 0.0.0.9000
 Authors@R: 
-    person("First", "Last", , "first.last@example.com", role = c("aut", "cre"),
-           comment = c(ORCID = "YOUR-ORCID-ID"))
-Description: What the package does (one paragraph).
-License: `use_mit_license()`, `use_gpl3_license()` or friends to pick a
-    license
+    person("Bill", "Shipley", , "Bill.Shipley@USherbrooke.ca", role = c("aut", "cre"),
+           comment = c(ORCID = "0000-0002-7026-3880"))
+Description: Conducts a dsep test of a directed, or mixed, acyclic graph without latent variables
+       based on linear, generalized linear, or additive models
+       with or without a nesting structure for the data.
+License: MIT + file LICENSE
 Encoding: UTF-8
 Roxygen: list(markdown = TRUE)
 RoxygenNote: 7.2.3
+Imports: 
+    gamm4,
+    ggm,
+    mgcv
+Suggests:
+    testthat
+Depends: 
+    R (>= 2.10)
+LazyData: true
