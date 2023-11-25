@@ -28,7 +28,7 @@ pwSEM.class<-function(x){
 #This is the code to create the documentation for the function
 #' @title The pwSEM function
 #' @description This function performs a "piecewise" structural equation model without explicit latent variables
-#' (also called a "path" model),
+#' (a "path" model),
 #' possibly including with dependent errors, based on generalized
 #' linear or additive models, possibly in a mixed model context, and then tests
 #' the causal structure against an empirical data set using a dsep test.  Therefore, it is able to
