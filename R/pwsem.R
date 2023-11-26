@@ -146,6 +146,7 @@ pwSEM<-function(sem.functions,dependent.errors=NULL,data,
 #  class(x)<-"pwSEM.class"
   x<-pwSEM.class(x)
   x
+  #
 }
 
 
