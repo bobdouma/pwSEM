@@ -81,4 +81,5 @@ my.list<-list(gamm4::gamm4(XF~1,random=~(1|nest)+(1|year),family="gaussian",data
 summary(pwSEM(sem.functions=my.list,data=nested_data,
       use.permutations=FALSE,do.smooth=FALSE,dependent.errors=list(XP~~XF),
       all.grouping.vars=c("nest","year")))
+
 }

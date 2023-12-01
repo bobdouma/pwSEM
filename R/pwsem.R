@@ -86,6 +86,7 @@ pwSEM.class<-function(x){
 #'       use.permutations=FALSE,do.smooth=FALSE,dependent.errors=list(XP~~XF),
 #'       all.grouping.vars=c("nest","year")))
 
+#'
 #' @export
 pwSEM<-function(sem.functions,dependent.errors=NULL,data,
                 use.permutations=FALSE,n.perms=5000,do.smooth=FALSE,

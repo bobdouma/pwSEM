@@ -6,7 +6,7 @@
 \title{sim_data:
 Simulated data with correlated errors involving endogenous
 variables and without any grouping structure.  Data generated
-using the following mixed acyclic graph:
+using this mixed acyclic graph:
 X1->X2->X3->X4 and X2<->X4}
 \format{
 \subsection{'sim_data'}{
@@ -27,7 +27,7 @@ sim_data
 sim_data:
 Simulated data with correlated errors involving endogenous
 variables and without any grouping structure.  Data generated
-using the following mixed acyclic graph:
+using this mixed acyclic graph:
 X1->X2->X3->X4 and X2<->X4
 }
 \keyword{datasets}
