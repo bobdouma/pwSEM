@@ -112,6 +112,8 @@ pwSEM<-function(sem.functions,dependent.errors=NULL,data,
          inherits(sem.functions[i][[1]],"gamm")))
       stop("Only gam or gamm4 functions can be used in pwSEM")
   }
+  #This sets a flag (TRUE) only if all models assume normality
+  is.normal<-is.family.normal(sem.functions)
   dag<-get.dag.from.sem(sem.functions)
   #This gives the names of the variables that are not latents
   not.latent.vars<-row.names(dag)
@@ -119,7 +121,7 @@ pwSEM<-function(sem.functions,dependent.errors=NULL,data,
   if(!is.null(dependent.errors)){
     #This adds free covariances to the adjacency matrix as "100"
     mag<-add.dependent.errors(DAG=dag,dependent.errors=dependent.errors)
-    x2<-MAG.to.DAG.in.pwSEM(mag)
+        x2<-MAG.to.DAG.in.pwSEM(mag)
     #This gets the names of the latent variables that have been
     #added in the extended DAG (x) to represent the free covariances
     latents<-extract.latents(dag.with.latents=x2,not.latent.vars=not.latent.vars)
@@ -139,15 +141,148 @@ pwSEM<-function(sem.functions,dependent.errors=NULL,data,
     dsep.null.probs<-out.dsep$null.probs
   }
   else C.stat<-p.C.stat<-dsep.null.probs<-NULL
+#refit sems to correct for parameter bias due to dependent
+#errors and outputs (1)the new fits, (2) the response residuals
+#(3) the covariance, pearson and spearman matrices of the
+#residuals and (4)sem.modified which holds "yes" or "no" depending
+#on whether each sem function was modified due to dependent
+#residuals, (5)standardized.sem gives standardized values if all
+#variables are normal
+  new.sems<-get.unbiased.sems(sem.functions,mag,
+                                  equivalent.mag,data)
+  sem.functions<-new.sems$sem.functions
+
   x<-list(causal.graph=mag,dsep.equivalent.causal.graph=equivalent.mag,basis.set=basis.set,
           dsep.probs=dsep.null.probs,sem.functions=sem.functions,
           C.statistic=C.stat,prob.C.statistic=p.C.stat,
           AIC=get.AIC(sem.functions),n.data.lines=n.data.lines,
-          use.permutations=use.permutations,n.perms=n.perms)
-#  class(x)<-"pwSEM.class"
+          use.permutations=use.permutations,n.perms=n.perms,
+          residual.cov.matrix=new.sems$covariance.matrix,
+          residual.pearson.matrix=new.sems$pearson.matrix,
+          residual.spearman.matrix=new.sems$spearman.matrix,
+          sem.modified=new.sems$sem.modified,standardized.sem=
+          new.sems$standardized.sem.functions,excluded.terms=
+            new.sems$excluded.terms,dependent.errors=
+            dependent.errors,response.residuals=
+            new.sems$residual.values)
+#IS THE AIC STATISTIC CALCULATED CORRECTLY???
+    class(x)<-"pwSEM.class"
   x<-pwSEM.class(x)
   x
-  #
+}
+
+get.unbiased.sems<-function(sem.functions,mag,equivalent.mag,
+                            dat){
+#This function refits the sem.functions to agree with the
+#equivalent graph model form and then calculates values for
+#dependent errors:
+#variance & Pearson r if all are normal; else
+#Spearman r if not.
+  is.normal<-is.family.normal(sem.functions)
+  var.names<-dimnames(mag)[2]
+  ncol<-dim(mag)[2]
+  nobs<-dim(dat)[1]
+  if(is.normal){
+    cov.matrix<-matrix(NA,nrow=ncol,ncol=ncol,
+        dimnames=dimnames(mag))
+    pearson.matrix<-spearman.matrix<-cov.matrix
+  }
+  if(!is.normal){
+    spearman.matrix<-matrix(NA,nrow=ncol,ncol=ncol,
+          dimnames=list(var.names,var.names))
+    cov.matrix<-pearson.matrix<-spearman.matrix
+  }
+
+  mag2<-mag
+  #remove free covariances from the mag
+  mag2[mag==100]<-0
+  equivalent.mag2<-equivalent.mag
+  #remove free covariances from the equivalent mag
+  equivalent.mag2[equivalent.mag==100]<-0
+#This holds the response residuals for each variable
+  residual.values<-matrix(NA,ncol=ncol,nrow=nobs,
+        dimnames=list(as.character(1:nobs),var.names[[1]]))
+  sem.modified<-rep("no",ncol)
+  hold.excluded.terms<-matrix(NA,ncol,ncol)
+  for(i in 1:ncol){
+#Compare the mag and equivalent.mag for this variable, after
+#replacing 100 (free covariance)
+    is.same<-mag2[,i]!=equivalent.mag2[,i]
+#these are the dependent variables that have to be added
+    names.to.add<-var.names[[1]][is.same]
+    if(sum(is.same)==0){
+#calculate and store residuals using the original fits
+#since no new variables were added to the fits
+      residual.values[,i]<-residuals(sem.functions[[i]],
+                                     type="response")
+    }
+    if(sum(is.same)>0){
+      sem.modified[i]<-"yes"
+      n.to.add<-sum(is.same)
+      exclude.terms<-rep(NA,n.to.add)
+      exclude.terms[1]<-paste("s(",names.to.add[1],")",sep="")
+      add.terms<-paste("s(",names.to.add[1],")",
+                       collapse=" + ",sep="")
+      for(j in 2:n.to.add){
+        add.terms<-paste(add.terms,"+ s(",names.to.add[j],")",
+                         collapse=" + ",sep="")
+        exclude.terms[j]<-paste("s(",
+              names.to.add[j],")",sep="")
+      }
+      hold.excluded.terms[i,1:n.to.add]<-exclude.terms
+#add the extra variables from the equivalent mag and redo fit
+      sem.functions[[i]]<-update(sem.functions[[i]],
+              formula=as.formula(paste("~. + ",add.terms)))
+#Now, calculate dependent errors
+      pred.i<-predict(sem.functions[[i]],exclude=exclude.terms,
+                      type="response")
+#To get the right column in dat...
+      sel.col<-names(dat)==
+        as.character(sem.functions[[i]]$formula[2])
+      residual.values[,i]<-(dat[,sel.col]-pred.i)
+    }
+  }
+
+  if(is.normal){
+    cov.matrix<-var(residual.values)
+    pearson.matrix<-cor(residual.values)
+  }
+  if(!is.normal){
+    spearman.matrix<-cor(residual.vaues,method="spearman")
+  }
+
+#If all data are normal, get the standardized coefficients
+  standardized.sem.functions<-sem.functions
+  if(is.normal){
+    dat2<-data.frame(scale(dat[,match(var.names[[1]],names(dat))]))
+    for(i in 1:ncol){
+     standardized.sem.functions[[i]]<-
+       update(sem.functions[[i]],formula=~.,data=dat2)
+    }
+  }
+  if(!is.normal)standardized.sem.functions<-NULL
+
+  list(sem.functions=sem.functions,residuals=residual.values,
+    covariance.matrix=cov.matrix,pearson.matrix=pearson.matrix,
+    spearman.matrix=spearman.matrix,sem.modified=sem.modified,
+    standardized.sem.functions=standardized.sem.functions,
+    excluded.terms=hold.excluded.terms,residual.values=
+    residual.values)
+}
+
+is.family.normal<-function(sem.functions){
+  # This function returns TRUE if all of the models in the
+  # sem.functions list assume normally distributed
+  # variables; else returns FALSE
+  flag<-TRUE
+  #CHECK that this holds for both gam and gamm
+  for(i in length(sem.functions)){
+    if(sem.functions[[i]]$family[1]!="gaussian"){
+      flag<-FALSE
+      return(flag)
+    }
+    return(flag)
+  }
 }
 
 
@@ -296,32 +431,104 @@ summary.pwSEM.class<-function(object,structural.equations=FALSE,...){
   cat("AIC statistic:",object$AIC,fill=T,"\n")
   if(structural.equations){
     n.funs<-length(object$sem.functions)
-    cat("_______Piecewise Functions__________",fill=T)
+    cat("_______Piecewise Structural Equations__________",fill=T)
     cat("\n")
 
     for(i in 1:n.funs){
       if(inherits(object$sem.functions[[i]],"gam")){
         for.i<-as.character(object$sem.functions[[i]]$formula)
         cat("(",i,"):",for.i[2],for.i[1],for.i[3],fill=T)
+        if(object$sem.modified[i]=="yes"){
+          cat("The following terms were added to account for dependent errors","\n")
+          cat("but are not part of your structural equation","\n")
+          print(object$excluded.terms[i,
+            !is.na(object$excluded.terms[i,])])
+          cat("\n")
+        }
         cat("         Parametric coefficients:",fill=T)
         print(summary(object$sem.functions[[i]])$p.table)
         cat("         Smoother terms:","\n",fill=T)
+        exclude.rows<-match(row.names(summary(
+          object$sem.functions[[1]])),object$exclude.terms)
+        print(summary(object$sem.functions[[i]])$
+          s.table[exclude.rows,])
 
-        print(summary(object$sem.functions[[i]])$s.table)
+        if(is.family.normal(object$sem.functions)){
+          cat("\n")
+          cat("Since all variables are modelled as normally distributed,","\n")
+          cat("here is the standardized structural equation:","\n")
+
+          cat("         Parametric coefficients:",fill=T)
+          print(summary(object$standardized.sem[[i]])$p.table)
+          cat("         Smoother terms:","\n",fill=T)
+          exclude.rows<-match(row.names(summary(
+            object$standardized.sem[[1]])),object$exclude.terms)
+          print(summary(object$standardized.sem[[i]])$
+                  s.table[exclude.rows,])
+
+        }
         cat("___________________","\n")
       }
       else{
         for.i<-as.character(object$sem.functions[[i]]$gam$formula)
         cat("(",i,"):",for.i[2],for.i[1],for.i[3],fill=T)
+
+        if(object$sem.modified[i]=="yes"){
+          cat("The following terms were added to account for dependent errors","\n")
+          cat("but are not part of your structural equation","\n")
+          print(object$excluded.terms[i,
+           !is.na(object$excluded.terms[i,])])
+          cat("\n")
+        }
         cat("         Parametric coefficients:",fill=T)
         print(summary(object$sem.functions[[i]]$gam)$p.table)
         cat("         Smoother terms:","\n",fill=T)
-        print(summary(object$sem.functions[[i]]$gam)$s.table)
+        exclude.rows<-match(row.names(summary(
+          object$sem.functions[[1]])),object$exclude.terms)
+        print(summary(object$sem.functions[[i]]$gam)$s.table[exclude.rows,])
+        if(is.family.normal(object$sem.functions)){
+          cat("\n")
+          cat("Since all variables are modelled as normally distributed,","\n")
+          cat("here is the standardized structural equation:","\n")
+
+          cat("         Parametric coefficients:",fill=T)
+          print(summary(object$standardized.sem[[i]])$p.table)
+          cat("         Smoother terms:","\n",fill=T)
+          exclude.rows<-match(row.names(summary(
+            object$standardized.sem[[1]])),object$exclude.terms)
+          print(summary(object$standardized.sem[[i]])$
+                  s.table[exclude.rows,])
+
+        }
         cat("___________________","\n")
       }
     }
+    cat("\n")
+    n.free<-length(object$dependent.errors)
+    for(ik in 1:n.free){
+      cat("_________ Dependent Errors _________________","\n")
+
+      var.numbers<-1:length(var.names)
+      for(ij in 1:n.free){
+        print(object$dependent.errors[ij])
+        x<-as.character(object$dependent.errors[[ij]][2])
+        y<-gsub("~","",as.character(object$dependent.errors[[ij]][3]))
+        x.index<-var.nums[var.names==x]
+        y.index<-var.nums[var.names==y]
+        if(is.family.normal(object$sem.functions)){
+          cat("Pearson correlation: ",
+            round(object$residual.pearson.matrix[x.index,y.index],4),"\n")
+          cat("Covariance: ",
+              round(object$residual.cov.matrix[x.index,y.index],4),"\n")
+        }
+        if(!is.family.normal(object$sem.functions)){
+          cat("Spearman correlation: ",
+              round(object$residual.spearman.matrix[x.index,y.index],4),"\n")
+        }
+    }
 
 
+    }
   }
 }
 
@@ -721,7 +928,7 @@ get.residuals<-function(my.list,dsep,data,do.smooth,
   #data is the data set to be used
   #observed.vars holds the names of all observed variables in MAG
   info<-set.up.info.for.dsep.regressions(my.list,
-                                         all.grouping.vars=all.grouping.vars)
+        all.grouping.vars=all.grouping.vars)
   n.vars<-length(info$var.name)
   if(n.vars!=length(observed.vars))
     stop("You have not modelled all variables in the DAG/MAG.
