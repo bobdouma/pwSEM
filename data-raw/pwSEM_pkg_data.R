@@ -7,14 +7,18 @@
 #' \item{X1}{A Guassian variable}
 #' \item{X2}{A Poisson variable}
 #' \item{X3}{A Poisson variable}
-#' \item{X4}{A Guassian variable}
+#' \item{X4}{A Poisson variable}
 #' }
 set.seed(100)
-L<-stats::rnorm(100,0,1)
-X1<-stats::rnorm(100,4,1)
-X2<-round(4+rpois(100,lambda=X1+L),0)
-X3<-round(rpois(100,lambda=X2))
-X4<-X3-L+rnorm(100,0,2)
+N<-100
+L<-stats::rnorm(N,0,2)
+X1<-stats::rnorm(N,0,0.4)
+lambda.X2<- 0.25*X1+0.25*L #This is the link function
+X2<-rpois(n=100,lambda=exp(lambda.X2))
+lambda.X3<-0.25*X2 #This is the link function
+X3<-rpois(n=100,lambda=exp(lambda.X3))
+lambda.X4<-0.25*X3+0.25*L #This is the link function
+X4<-rpois(n=100,lambda=exp(lambda.X4))
 sim_data<-data.frame(X1,X2,X3,X4)
 pairs(sim_data)
 usethis::use_data(sim_data,overwrite=TRUE)

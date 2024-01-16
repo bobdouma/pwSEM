@@ -64,12 +64,12 @@ pwSEM.class<-function(x){
 #' library(mgcv)
 #' my.list<-list(mgcv::gam(X1~1,data=sim_data,family=gaussian),
 #'          mgcv::gam(X2~X1,data=sim_data,family=poisson),
-#'          mgcv::gam(X3~X2,data=sim_data,family=gaussian),
-#'          mgcv::gam(X4~X3,data=sim_data,family=gaussian))
+#'          mgcv::gam(X3~X2,data=sim_data,family=poisson),
+#'          mgcv::gam(X4~X3,data=sim_data,family=poisson))
 #' # RUN THE pwSEM FUNCTION WITH PERMUTATION PROBABILITIES AND INCLUDING THE DEPENDENT ERRORS
 #' out<-pwSEM(sem.functions=my.list,dependent.errors=list(X4~~X2),
 #'           data=sim_data,use.permutations = TRUE)
-#' summary(out)
+#' summary(out,structural.equations=TRUE)
 #
 #' # Example with nesting structure using "nested_data" (included with this package)
 #' # and binary variable
@@ -189,7 +189,7 @@ get.unbiased.sems<-function(sem.functions,mag,equivalent.mag,
   }
   if(!is.normal){
     spearman.matrix<-matrix(NA,nrow=ncol,ncol=ncol,
-          dimnames=list(var.names,var.names))
+          dimnames=dimnames(mag))
     cov.matrix<-pearson.matrix<-spearman.matrix
   }
 
@@ -213,21 +213,37 @@ get.unbiased.sems<-function(sem.functions,mag,equivalent.mag,
     if(sum(is.same)==0){
 #calculate and store residuals using the original fits
 #since no new variables were added to the fits
-      residual.values[,i]<-residuals(sem.functions[[i]],
+
+#The problem is that, for a gamm4 model, there are two types of
+#residuals:sem.functions[[i]]$mer (linear mixed-effects component)
+#and sem.functions[[i]]$gam (generalized additive models component).
+#I think that I need the linear mixed-effects component CHATGPT:
+#"The linear mixed-effects component of the residuals captures the
+#deviation of individual observations from the fixed effects plus the
+#random effects".
+      if(inherits(sem.functions[i][[1]],"gam")){
+        residual.values[,i]<-residuals(sem.functions[[i]],
+                                       type="response")
+      }
+      else{
+        residual.values[,i]<-residuals(sem.functions[[i]]$mer,
                                      type="response")
+      }
     }
     if(sum(is.same)>0){
       sem.modified[i]<-"yes"
       n.to.add<-sum(is.same)
       exclude.terms<-rep(NA,n.to.add)
-      exclude.terms[1]<-paste("s(",names.to.add[1],")",sep="")
-      add.terms<-paste("s(",names.to.add[1],")",
+      exclude.terms[1]<-paste(names.to.add[1],sep="")
+      add.terms<-paste(names.to.add[1],
                        collapse=" + ",sep="")
       for(j in 2:n.to.add){
-        add.terms<-paste(add.terms,"+ s(",names.to.add[j],")",
+#add.terms holds the additional variables and code to extend the
+#model fit.  These will be linear fits in order to avoid problems
+#involving smoother degrees of freedom.
+        add.terms<-paste(add.terms,"+ ",names.to.add[j],
                          collapse=" + ",sep="")
-        exclude.terms[j]<-paste("s(",
-              names.to.add[j],")",sep="")
+        exclude.terms[j]<-paste(names.to.add[j],sep="")
       }
       hold.excluded.terms[i,1:n.to.add]<-exclude.terms
 #add the extra variables from the equivalent mag and redo fit
@@ -242,13 +258,12 @@ get.unbiased.sems<-function(sem.functions,mag,equivalent.mag,
       residual.values[,i]<-(dat[,sel.col]-pred.i)
     }
   }
-
   if(is.normal){
     cov.matrix<-var(residual.values)
     pearson.matrix<-cor(residual.values)
   }
   if(!is.normal){
-    spearman.matrix<-cor(residual.vaues,method="spearman")
+    spearman.matrix<-cor(residual.values,method="spearman")
   }
 
 #If all data are normal, get the standardized coefficients
@@ -275,14 +290,22 @@ is.family.normal<-function(sem.functions){
   # sem.functions list assume normally distributed
   # variables; else returns FALSE
   flag<-TRUE
-  #CHECK that this holds for both gam and gamm
+  #CHECK that this holds for both gam and gamm4
   for(i in length(sem.functions)){
-    if(sem.functions[[i]]$family[1]!="gaussian"){
+    if(inherits(sem.functions[i][[1]],"gam")){
+      if(sem.functions[i][[1]]$family$family!="gaussian"){
+        flag<-FALSE
+        return(flag)
+      }
+    }
+    if((inherits(sem.functions[i][[1]]$mer, "lmerMod") |
+        inherits(sem.functions[i][[1]]$mer, "glmerMod")) &
+       sem.functions[i][[1]]$gam$family$family!="gaussian"){
       flag<-FALSE
       return(flag)
     }
-    return(flag)
   }
+  return(flag)
 }
 
 

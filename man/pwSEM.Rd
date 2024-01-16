@@ -62,12 +62,12 @@ generalized additive mixed models.
 library(mgcv)
 my.list<-list(mgcv::gam(X1~1,data=sim_data,family=gaussian),
          mgcv::gam(X2~X1,data=sim_data,family=poisson),
-         mgcv::gam(X3~X2,data=sim_data,family=gaussian),
-         mgcv::gam(X4~X3,data=sim_data,family=gaussian))
+         mgcv::gam(X3~X2,data=sim_data,family=poisson),
+         mgcv::gam(X4~X3,data=sim_data,family=poisson))
 # RUN THE pwSEM FUNCTION WITH PERMUTATION PROBABILITIES AND INCLUDING THE DEPENDENT ERRORS
 out<-pwSEM(sem.functions=my.list,dependent.errors=list(X4~~X2),
           data=sim_data,use.permutations = TRUE)
-summary(out)
+summary(out,structural.equations=TRUE)
 # Example with nesting structure using "nested_data" (included with this package)
 # and binary variable
 # CREATE A LIST HOLDING THE STRUCTURAL EQUATIONS USING gamm4()
