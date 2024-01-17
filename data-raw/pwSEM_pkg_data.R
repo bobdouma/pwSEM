@@ -1,6 +1,6 @@
 #MAG: X1->X2->X3->X4 and X2<->X4
 #CASE 1: normal variables and no nesting
-set.seed(100)
+set.seed(101)
 N<-100
 L<-stats::rnorm(N,0,1)
 X1<-stats::rnorm(N,0,1)
