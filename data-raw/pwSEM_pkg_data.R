@@ -4,12 +4,9 @@ set.seed(100)
 N<-100
 L<-stats::rnorm(N,0,1)
 X1<-stats::rnorm(N,0,1)
-X2.link<-0.5*X1+0.5*L
-X2<-stats::rnorm(N,X2.link,sqrt(1-2*0.5^2))
-X3.link<-0.5*X2
-X3<-stats::rnorm(N,X3.link,sqrt(1-0.5^2))
-X4.link<-0.5*X3+0.5*L
-X4<-stats::rnorm(N,X3.link,sqrt(1-2*0.5^2))
+X2<-0.5*X1+0.5*L + stats::rnorm(N,0,sqrt(1-2*0.5^2))
+X3<-0.5*X2 + stats::rnorm(N,0,sqrt(1-0.5^2))
+X4<-0.5*X3+0.5*L + stats::rnorm(N,0,sqrt(1-2*0.5^2))
 sim_normal.no.nesting<-data.frame(X1=X1,X2=X2,X3=X3,X4=X4)
 pairs(sim_normal.no.nesting)
 usethis::use_data(sim_normal.no.nesting,overwrite=TRUE)

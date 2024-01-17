@@ -128,9 +128,7 @@ pwSEM<-function(sem.functions,dependent.errors=NULL,data,
       stop("Only gam or gamm4 functions can be used in pwSEM")
   }
   #This sets a flag (TRUE) only if all models assume normality
-  print("before is.normal")
   is.normal<-is.family.normal(sem.functions)
-  print("after is.normal")
   dag<-get.dag.from.sem(sem.functions)
   #This gives the names of the variables that are not latents
   not.latent.vars<-row.names(dag)
@@ -165,10 +163,8 @@ pwSEM<-function(sem.functions,dependent.errors=NULL,data,
 #on whether each sem function was modified due to dependent
 #residuals, (5)standardized.sem gives standardized values if all
 #variables are normal
-  print("before new.sims")
   new.sems<-get.unbiased.sems(sem.functions,mag,
                                   equivalent.mag,data)
-  print("after new.sims")
   sem.functions<-new.sems$sem.functions
 
   x<-list(causal.graph=mag,dsep.equivalent.causal.graph=equivalent.mag,basis.set=basis.set,
