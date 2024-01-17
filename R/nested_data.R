@@ -1,5 +1,5 @@
-#' nested_data:
-#' An example with nesting structure
+#' Empirical example with nesting structure, a binomial variable, and
+#' 3-level nesting structure.
 #' @format ## 'nested_data'
 #' \describe{
 #' \item{year}{Year observation is collected}
@@ -11,4 +11,4 @@
 #' \item{HP}{A Guassian variable}
 #' \item{XF}{A Gaussian variable}
 #' }
-"nested_data"
+#' "nested.data"
