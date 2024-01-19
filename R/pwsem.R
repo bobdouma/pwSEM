@@ -106,6 +106,7 @@ pwSEM.class<-function(x){
 pwSEM<-function(sem.functions,dependent.errors=NULL,data,
                 use.permutations=FALSE,n.perms=5000,do.smooth=FALSE,
                 all.grouping.vars=NULL){
+  #
   #sem.functions is a list giving the gamm4 or gam models associated with each
   #variable in the sem, including exogenous variables.
   #dependent.errors is a list giving any free covariances, given
