@@ -86,7 +86,23 @@ pwSEM.class<-function(x){
 #' out<-pwSEM(sem.functions=my.list,dependent.errors=list(X4~~X2),
 #'           data=sim_poisson.no.nesting,use.permutations = TRUE)
 #' summary(out,structural.equations=TRUE)
-#
+#'
+#' Simulated data with correlated errors involving endogenous
+#' variables, normally-distributed data and with a 2-level grouping
+#' structure and using smoothing splines for the d-separation tests.
+#' Data generated using this mixed acyclic graph:
+#' X1->X2->X3->X4 and X2<->X4
+#'
+#' my.list<-list(gamm4::gamm4(X1~1,random=~(1|group),data=sim_normal.with.nesting,family=gaussian),
+#'          gamm4::gamm4(X2~X1,random=~(1|group),data=sim_normal.with.nesting,family=gaussian),
+#'          gamm4::gamm4(X3~X2,random=~(1|group),data=sim_normal.with.nesting,family=gaussian),
+#'          gamm4::gamm4(X4~X3,random=~(1|group),data=sim_normal.with.nesting,family=gaussian))
+#' # RUN THE pwSEM FUNCTION WITH PERMUTATION PROBABILITIES AND INCLUDING THE DEPENDENT ERRORS
+#' out<-pwSEM(sem.functions=my.list,dependent.errors=list(X4~~X2),
+#'           data=sim_normal.with.nesting,use.permutations = TRUE,
+#'           do.smooth=FALSE,all.grouping.vars=c("group"))
+#' summary(out,structural.equations=TRUE)
+
 #' # Empirical example with normal and binomial data,a 3-level nesting structure
 #'  using "nested_data" (included with this package)
 #' # CREATE A LIST HOLDING THE STRUCTURAL EQUATIONS USING gamm4()
@@ -164,12 +180,13 @@ pwSEM<-function(sem.functions,dependent.errors=NULL,data,
 #on whether each sem function was modified due to dependent
 #residuals, (5)standardized.sem gives standardized values if all
 #variables are normal
-  new.sems<-get.unbiased.sems(sem.functions,mag,
-                                  equivalent.mag,data)
-  sem.functions<-new.sems$sem.functions
+  new.sems<-get.unbiased.sems(sem.functions=sem.functions,mag=mag,
+      equivalent.mag=equivalent.mag,dat=data,
+      all.grouping.vars=all.grouping.vars)
+#  sem.functions<-new.sems$sem.functions
 
   x<-list(causal.graph=mag,dsep.equivalent.causal.graph=equivalent.mag,basis.set=basis.set,
-          dsep.probs=dsep.null.probs,sem.functions=sem.functions,
+          dsep.probs=dsep.null.probs,sem.functions=new.sems$sem.functions,
           C.statistic=C.stat,prob.C.statistic=p.C.stat,
           AIC=get.AIC(sem.functions),n.data.lines=n.data.lines,
           use.permutations=use.permutations,n.perms=n.perms,
@@ -188,7 +205,7 @@ pwSEM<-function(sem.functions,dependent.errors=NULL,data,
 }
 
 get.unbiased.sems<-function(sem.functions,mag,equivalent.mag,
-                            dat){
+                            dat,all.grouping.vars){
 #This function refits the sem.functions to agree with the
 #equivalent graph model form and then calculates values for
 #dependent errors:
@@ -246,6 +263,7 @@ get.unbiased.sems<-function(sem.functions,mag,equivalent.mag,
                                      type="response")
       }
     }
+    add.terms<-NULL
     if(sum(is.same)>0){
       sem.modified[i]<-"yes"
       n.to.add<-sum(is.same)
@@ -257,20 +275,31 @@ get.unbiased.sems<-function(sem.functions,mag,equivalent.mag,
 #add.terms holds the additional variables and code to extend the
 #model fit.  These will be linear fits in order to avoid problems
 #involving smoother degrees of freedom.
-        add.terms<-paste(add.terms,"+ ",names.to.add[j],
+        add.terms<-paste(add.terms," + ",names.to.add[j],
                          collapse=" + ",sep="")
         exclude.terms[j]<-paste(names.to.add[j],sep="")
       }
       hold.excluded.terms[i,1:n.to.add]<-exclude.terms
 #add the extra variables from the equivalent mag and redo fit
-      sem.functions[[i]]<-update(sem.functions[[i]],
-              formula=as.formula(paste("~. + ",add.terms)))
+      sem.functions[[i]]<-update.fun(sem.functions=sem.functions,
+        i=i,all.grouping.vars=all.grouping.vars,add.terms=add.terms,
+        data=dat)
 #Now, calculate dependent errors
+      if(inherits(sem.functions[[i]],"gam"))
       pred.i<-predict(sem.functions[[i]],exclude=exclude.terms,
                       type="response")
+      if(!inherits(sem.functions[[i]],"gam")){
+        pred.i<-predict(sem.functions[[i]]$gam,exclude=exclude.terms,
+                        type="response")
+      }
+
 #To get the right column in dat...
-      sel.col<-names(dat)==
+      if(inherits(sem.functions[[i]],"gam"))
+        sel.col<-names(dat)==
         as.character(sem.functions[[i]]$formula[2])
+      if(!inherits(sem.functions[[i]],"gam"))
+        sel.col<-names(dat)==
+        as.character(sem.functions[[i]]$gam$formula[2])
       residual.values[,i]<-(dat[,sel.col]-pred.i)
     }
   }
@@ -282,13 +311,52 @@ get.unbiased.sems<-function(sem.functions,mag,equivalent.mag,
     spearman.matrix<-cor(residual.values,method="spearman")
   }
 
+  update.fun<-function(sem.functions,i,all.grouping.vars,add.terms,data){
+    #This function updates a gamm4 or gam model by adding the terms in "add.terms"
+    #to the model formula and returning the fitted model
+    #if add.terms=NULL, it returns the same model fit
+    #if add.terms="none", it refits the model without adding terms
+    #else it adds new terms and refits the model
+    #
+    #gam can be updated to add the extra terms
+    if(inherits(sem.functions[[i]],"gam")){
+      return(update(sem.functions[[i]],
+                    formula=as.formula(paste("~. + ",add.terms))))
+    }
+    #gamm4 cannot, so we must do it manually
+    else{
+      if(is.null(add.terms))return(sem.functions[[i]])
+      info<-set.up.info.for.dsep.regressions(fun.list=sem.functions,
+                                             all.grouping.vars=all.grouping.vars)
+      old.fo<-as.character(sem.functions[[i]]$gam$formula)
+      if(add.terms=="none")
+        new.fo<-paste(old.fo[2],old.fo[1],old.fo[3])
+      if(add.terms!="none")
+      new.fo<-paste(old.fo[2],old.fo[1],old.fo[3],"+",add.terms)
+      fit<-gamm4::gamm4(formula=as.formula(new.fo),random=info$random[[i]],
+                        family=info$family[[i]],data=data)
+      return(fit)
+    }
+  }
+
+
 #If all data are normal, get the standardized coefficients
   standardized.sem.functions<-sem.functions
   if(is.normal){
-    dat2<-data.frame(scale(dat[,match(var.names[[1]],names(dat))]))
+    no.match<-!(1:dim(dat)[2])%in%match(var.names[[1]],names(dat))
+    datA<-data.frame(scale(dat[,match(var.names[[1]],names(dat))]))
+    datB<-dat[,no.match]
+    dat2<-cbind(datA,datB)
+    dimnames(dat2)<-dimnames(dat)
     for(i in 1:ncol){
-     standardized.sem.functions[[i]]<-
-       update(sem.functions[[i]],formula=~.,data=dat2)
+       if(inherits(sem.functions[[i]],"gam"))
+         update.fun(sem.functions=sem.functions,i=i,all.grouping.vars =
+              all.grouping.vars,add.terms=NULL,data=dat2)
+     if(!inherits(sem.functions[[i]],"gam"))
+       standardized.sem.functions[[i]]<-
+         update.fun(sem.functions=sem.functions,i=i,all.grouping.vars =
+            all.grouping.vars,add.terms="none",data=dat2)
+
     }
   }
   if(!is.normal)standardized.sem.functions<-NULL
@@ -967,7 +1035,7 @@ get.residuals<-function(my.list,dsep,data,do.smooth,
   #returned.
   #data is the data set to be used
   #observed.vars holds the names of all observed variables in MAG
-  info<-set.up.info.for.dsep.regressions(my.list,
+  info<-set.up.info.for.dsep.regressions(fun.list=my.list,
         all.grouping.vars=all.grouping.vars)
   n.vars<-length(info$var.name)
   if(n.vars!=length(observed.vars))
@@ -1056,6 +1124,7 @@ set.up.info.for.dsep.regressions<-function(fun.list,
   #of all the grouping variables included in fun.list
   n<-length(fun.list)
   #"n" is the number of variables, and gamm4 or gam models, in the DAG
+  #RETURNS:out
   out<-list(var.name=rep(NA,n),family=rep(NA,n),link=rep(NA,n),
             grouping.structure=matrix(NA,nrow=50,ncol=n),
             random=list())

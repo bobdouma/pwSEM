@@ -84,6 +84,22 @@ my.list<-list(mgcv::gam(X1~1,data=sim_poisson.no.nesting,family=gaussian),
 out<-pwSEM(sem.functions=my.list,dependent.errors=list(X4~~X2),
           data=sim_poisson.no.nesting,use.permutations = TRUE)
 summary(out,structural.equations=TRUE)
+
+Simulated data with correlated errors involving endogenous
+variables, normally-distributed data and with a 2-level grouping
+structure and using smoothing splines for the d-separation tests.
+Data generated using this mixed acyclic graph:
+X1->X2->X3->X4 and X2<->X4
+
+my.list<-list(gamm4::gamm4(X1~1,random=~(1|group),data=sim_normal.with.nesting,family=gaussian),
+         gamm4::gamm4(X2~X1,random=~(1|group),data=sim_normal.with.nesting,family=gaussian),
+         gamm4::gamm4(X3~X2,random=~(1|group),data=sim_normal.with.nesting,family=gaussian),
+         gamm4::gamm4(X4~X3,random=~(1|group),data=sim_normal.with.nesting,family=gaussian))
+# RUN THE pwSEM FUNCTION WITH PERMUTATION PROBABILITIES AND INCLUDING THE DEPENDENT ERRORS
+out<-pwSEM(sem.functions=my.list,dependent.errors=list(X4~~X2),
+          data=sim_normal.with.nesting,use.permutations = TRUE,
+          do.smooth=FALSE,all.grouping.vars=c("group"))
+summary(out,structural.equations=TRUE)
 # Empirical example with normal and binomial data,a 3-level nesting structure
  using "nested_data" (included with this package)
 # CREATE A LIST HOLDING THE STRUCTURAL EQUATIONS USING gamm4()
