@@ -26,7 +26,7 @@ Read the error messages and make sure all packages dependencies are installed an
 # manually installing a dependencies
 install.packages("packagename")
 
-until all packages are installed. A current bug in install_github on Windows prevents the installation of package dependencies of dependencies (lavaan and ggm).
+until all packages are installed. A current bug in install_github on Windows prevents the installation of package dependencies of dependencies (mgcv and ggm).
 Step 2
 
 Although this should not be required, for certain packages with compiled code, Rtools and MiKTeX need to be installed on Windows to be able to build source packages. For Mac users, Xcode is required and can be installed through the apple store. Here is a more detailed list of prerequisites for building source packages for Windows, Mac and Linux.
