@@ -9,6 +9,13 @@ X3<-0.5*X2 + stats::rnorm(N,0,sqrt(1-0.5^2))
 X4<-0.5*X3+0.5*L + stats::rnorm(N,0,sqrt(1-2*0.5^2))
 sim_normal.no.nesting<-data.frame(X1=X1,X2=X2,X3=X3,X4=X4)
 pairs(sim_normal.no.nesting)
+my.list<-list(mgcv::gam(X1~1,data=sim_normal.no.nesting,family=gaussian),
+              mgcv::gam(X2~X1,data=sim_normal.no.nesting,family=gaussian),
+              mgcv::gam(X3~X2,data=sim_normal.no.nesting,family=gaussian),
+              mgcv::gam(X4~X3,data=sim_normal.no.nesting,family=gaussian))
+out<-pwSEM(sem.functions=my.list,dependent.errors=list(X4~~X2),
+           data=sim_normal.no.nesting,use.permutations = TRUE)
+summary(out,structural.equations=TRUE)
 usethis::use_data(sim_normal.no.nesting,overwrite=TRUE)
 
 #CASE 2: Poisson variables and no nesting
@@ -25,30 +32,53 @@ lambda.X4<-0.25*X3+0.25*L #This is the link function
 X4<-rpois(n=100,lambda=exp(lambda.X4))
 sim_poisson.no.nesting<-data.frame(X1,X2,X3,X4)
 pairs(sim_poisson.no.nesting)
+my.list<-list(mgcv::gam(X1~1,data=sim_poisson.no.nesting,family=gaussian),
+              mgcv::gam(X2~X1,data=sim_poisson.no.nesting,family=poisson),
+              mgcv::gam(X3~X2,data=sim_poisson.no.nesting,family=poisson),
+              mgcv::gam(X4~X3,data=sim_poisson.no.nesting,family=poisson))
+out<-pwSEM(sem.functions=my.list,dependent.errors=list(X4~~X2),
+           data=sim_poisson.no.nesting,use.permutations = TRUE)
+summary(out,structural.equations=TRUE)
 usethis::use_data(sim_poisson.no.nesting,overwrite=TRUE)
 
 #CASE 3: normal variables with 2-level nesting
-set.seed(100)
-N<-100
+set.seed(101)
+N<-1000
 #10 groups, labeled A to J
-g<-rep(c("A","B","C","D","E","F","G","H","I","J"),10)
+g<-rep(c("A","B","C","D","E","F","G","H","I","J"),N/10)
 g<-sort(g)
 group.names<-unique(g)
 group.means<-rnorm(10,4,2)
-sim_normal.with.nesting<-data.frame(X1=rep(NA,100),X2=rep(NA,100),
-      X3=rep(NA,100),X4=rep(NA,100),group=g)
+sim_normal.with.nesting<-data.frame(X1=rep(NA,N),X2=rep(NA,N),
+      X3=rep(NA,N),X4=rep(NA,N),group=g)
 for(i in 1:10){
+  #group means follow MAG with slopes of 0.5
   L<-stats::rnorm(N/10,0,1)
-  sim_normal.with.nesting$X1[g==group.names[i]]<-stats::rnorm(N/10,group.means[i],1)
-  X2.link<-0.5*sim_normal.with.nesting$X1[g==group.names[i]]+0.5*L
-  sim_normal.with.nesting$X2[g==group.names[i]]<-stats::rnorm(N/10,X2.link,sqrt(1-2*0.5^2))
-  X3.link<-0.5*X2
-  sim_normal.with.nesting$X3[g==group.names[i]]<-stats::rnorm(N/10,X3.link,sqrt(1-0.5^2))
-  X4.link<-0.5*X3+0.5*L
-  sim_normal.with.nesting$X4[g==group.names[i]]<-stats::rnorm(N/10,X3.link,sqrt(1-2*0.5^2))
+  X1.g<-stats::rnorm(N/10,0,1)
+  X2.g<- 0.5*L + 0.5*X1.g + stats::rnorm(N/10,0,sqrt(1-2*0.5^2))
+  X3.g<- 0.5*X2.g + stats::rnorm(N/10,0,sqrt(1-0.5^2))
+  X4.g<- 0.5*L + 0.5*X3.g + stats::rnorm(N/10,0,sqrt(1-2*0.5^2))
+  for(j in 1:10){
+    #individual values follow DAG with slopes of -0.5
+    L<-stats::rnorm(N/10,0,1)
+    sim_normal.with.nesting$X1[g==group.names[i]]<-stats::rnorm(N/10,X1.g[i],0.5)
+    sim_normal.with.nesting$X2[g==group.names[i]]<- -1*L +
+      -0.5*sim_normal.with.nesting$X1[g==group.names[i]]+stats::rnorm(N/10,X2.g[i],0.5)
+    sim_normal.with.nesting$X3[g==group.names[i]]<-
+      -0.5*sim_normal.with.nesting$X2[g==group.names[i]]+stats::rnorm(N/10,X3.g[i],0.5)
+    sim_normal.with.nesting$X4[g==group.names[i]]<- 1*L +
+      -0.5*sim_normal.with.nesting$X3[g==group.names[i]]+stats::rnorm(N/10,X4.g[i],0.5)
+  }
 }
-sim_normal.with.nesting
 pairs(sim_normal.with.nesting[,1:4])
+my.list<-list(gamm4::gamm4(X1~1,random=~(1|group),data=sim_normal.with.nesting,family=gaussian),
+              gamm4::gamm4(X2~X1,random=~(1|group),data=sim_normal.with.nesting,family=gaussian),
+              gamm4::gamm4(X3~X2,random=~(1|group),data=sim_normal.with.nesting,family=gaussian),
+              gamm4::gamm4(X4~X3,random=~(1|group),data=sim_normal.with.nesting,family=gaussian))
+out<-pwSEM(sem.functions=my.list,dependent.errors=list(X4~~X2),
+           data=sim_normal.with.nesting,use.permutations = FALSE,
+           do.smooth=FALSE,all.grouping.vars=c("group"))
+summary(out,structural.equations=TRUE)
 usethis::use_data(sim_normal.with.nesting,overwrite=TRUE)
 
 

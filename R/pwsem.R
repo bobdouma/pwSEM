@@ -209,9 +209,13 @@ get.unbiased.sems<-function(sem.functions,mag,equivalent.mag,
 #This function refits the sem.functions to agree with the
 #equivalent graph model form and then calculates values for
 #dependent errors:
-#variance & Pearson r if all are normal; else
+#variance & Pearson r if all are normal and not mixed models; else
 #Spearman r if not.
+
+  #returns TRUE if all models assume normality
   is.normal<-is.family.normal(sem.functions)
+  #returns TRUE if any model is mixed
+  is.mixed<-is.model.mixed(sem.functions)
   var.names<-dimnames(mag)[2]
   ncol<-dim(mag)[2]
   nobs<-dim(dat)[1]
@@ -237,8 +241,19 @@ get.unbiased.sems<-function(sem.functions,mag,equivalent.mag,
         dimnames=list(as.character(1:nobs),var.names[[1]]))
   sem.modified<-rep("no",ncol)
   hold.excluded.terms<-matrix(NA,ncol,ncol)
+  #hold.dep.var.name holds the names of the dependent variable for each
+  #regression
+  hold.dep.var.name<-rep(NA,ncol)
+  #ncol is the number of variables in the mag
   for(i in 1:ncol){
-#Compare the mag and equivalent.mag for this variable, after
+    if(inherits(sem.functions[[i]],"gam")){
+      hold.dep.var.name[i]<-as.character(formula(sem.functions[[i]])[2])
+    }
+    if(!inherits(sem.functions[[i]],"gam")){
+      hold.dep.var.name[i]<-as.character(formula(sem.functions[[i]]$gam)[2])
+    }
+
+    #Compare the mag and equivalent.mag for this variable, after
 #replacing 100 (free covariance)
     is.same<-mag2[,i]!=equivalent.mag2[,i]
 #these are the dependent variables that have to be added
@@ -263,6 +278,8 @@ get.unbiased.sems<-function(sem.functions,mag,equivalent.mag,
                                      type="response")
       }
     }
+    #ends if(sum(is.same)==0)...
+    #variables have been added...
     add.terms<-NULL
     if(sum(is.same)>0){
       sem.modified[i]<-"yes"
@@ -301,65 +318,43 @@ get.unbiased.sems<-function(sem.functions,mag,equivalent.mag,
         sel.col<-names(dat)==
         as.character(sem.functions[[i]]$gam$formula[2])
       residual.values[,i]<-(dat[,sel.col]-pred.i)
+      #ends if(sum(is.same)>0)...
     }
+#ends for(i in 1:ncol) loop...
   }
+  dimnames(residual.values)<-list(as.character(1:nobs),
+                                  hold.dep.var.name)
+  dimnames(cov.matrix)<-dimnames(pearson.matrix)<-
+    dimnames(spearman.matrix)<-list(hold.dep.var.name,
+                                  hold.dep.var.name)
+#Only get Pearson's r and covariance if all variables are normal
   if(is.normal){
     cov.matrix<-var(residual.values)
     pearson.matrix<-cor(residual.values)
   }
+  #else, just calculate a Spearman r
   if(!is.normal){
     spearman.matrix<-cor(residual.values,method="spearman")
   }
 
-  update.fun<-function(sem.functions,i,all.grouping.vars,add.terms,data){
-    #This function updates a gamm4 or gam model by adding the terms in "add.terms"
-    #to the model formula and returning the fitted model
-    #if add.terms=NULL, it returns the same model fit
-    #if add.terms="none", it refits the model without adding terms
-    #else it adds new terms and refits the model
-    #
-    #gam can be updated to add the extra terms
-    if(inherits(sem.functions[[i]],"gam")){
-      return(update(sem.functions[[i]],
-                    formula=as.formula(paste("~. + ",add.terms))))
-    }
-    #gamm4 cannot, so we must do it manually
-    else{
-      if(is.null(add.terms))return(sem.functions[[i]])
-      info<-set.up.info.for.dsep.regressions(fun.list=sem.functions,
-                                             all.grouping.vars=all.grouping.vars)
-      old.fo<-as.character(sem.functions[[i]]$gam$formula)
-      if(add.terms=="none")
-        new.fo<-paste(old.fo[2],old.fo[1],old.fo[3])
-      if(add.terms!="none")
-      new.fo<-paste(old.fo[2],old.fo[1],old.fo[3],"+",add.terms)
-      fit<-gamm4::gamm4(formula=as.formula(new.fo),random=info$random[[i]],
-                        family=info$family[[i]],data=data)
-      return(fit)
-    }
-  }
-
-
 #If all data are normal, get the standardized coefficients
   standardized.sem.functions<-sem.functions
-  if(is.normal){
+  if(is.normal & !is.mixed){
     no.match<-!(1:dim(dat)[2])%in%match(var.names[[1]],names(dat))
+    #datA holds the scaled values for the variables in the MAG
     datA<-data.frame(scale(dat[,match(var.names[[1]],names(dat))]))
     datB<-dat[,no.match]
+    #dat2 holds the scaled values for the variables in the MAG plus
+    #the other (grouping) variables
     dat2<-cbind(datA,datB)
     dimnames(dat2)<-dimnames(dat)
     for(i in 1:ncol){
-       if(inherits(sem.functions[[i]],"gam"))
-         update.fun(sem.functions=sem.functions,i=i,all.grouping.vars =
-              all.grouping.vars,add.terms=NULL,data=dat2)
-     if(!inherits(sem.functions[[i]],"gam"))
-       standardized.sem.functions[[i]]<-
-         update.fun(sem.functions=sem.functions,i=i,all.grouping.vars =
-            all.grouping.vars,add.terms="none",data=dat2)
-
+      standardized.sem.functions[[i]]<-
+        update.fun(sem.functions=sem.functions,i=i,all.grouping.vars =
+          all.grouping.vars,add.terms="none",data=dat2)
     }
   }
-  if(!is.normal)standardized.sem.functions<-NULL
+  if(!is.normal | is.mixed)standardized.sem.functions<-NULL
 
   list(sem.functions=sem.functions,residuals=residual.values,
     covariance.matrix=cov.matrix,pearson.matrix=pearson.matrix,
@@ -367,6 +362,58 @@ get.unbiased.sems<-function(sem.functions,mag,equivalent.mag,
     standardized.sem.functions=standardized.sem.functions,
     excluded.terms=hold.excluded.terms,residual.values=
     residual.values)
+}
+
+update.fun<-function(sem.functions,i,all.grouping.vars,add.terms,data){
+  #This function updates a gamm4 or gam model by adding the terms in "add.terms"
+  #to the model formula and returning the fitted model
+  #if add.terms=NULL, it returns the same model fit
+  #if add.terms="none", it refits the model without adding terms
+  #else it adds new terms and refits the model
+  #
+  #gam can be updated to add the extra terms
+  if(inherits(sem.functions[[i]],"gam")){
+    if(!is.null(add.terms)){
+      if(add.terms=="none"){
+        return(update(sem.functions[[i]],
+              formula=paste("~."),data=data))
+      }
+
+      if(add.terms!="none"){
+        return(update(sem.functions[[i]],
+          formula=paste("~. + ",add.terms),data=data))
+      }
+    }
+  }
+  #gamm4 cannot, so we must do it manually
+  else{
+    if(!is.null(add.terms)){
+      info<-set.up.info.for.dsep.regressions(fun.list=sem.functions,
+                                             all.grouping.vars=all.grouping.vars)
+      old.fo<-as.character(sem.functions[[i]]$gam$formula)
+      if(add.terms=="none")
+        new.fo<-paste(old.fo[2],old.fo[1],old.fo[3])
+      if(add.terms!="none")
+        new.fo<-paste(old.fo[2],old.fo[1],old.fo[3],"+",add.terms)
+      fit<-gamm4::gamm4(formula=as.formula(new.fo),random=info$random[[i]],
+                        family=info$family[[i]],data=data)
+      return(fit)
+    }
+  }
+}
+
+is.model.mixed<-function(sem.functions){
+  # This function returns TRUE if any of the models in the
+  # sem.functions list are mixed models (i.e. do no use gam);
+  # else returns FALSE
+  flag<-FALSE
+  for(i in length(sem.functions)){
+    if(!inherits(sem.functions[i][[1]],"gam")){
+      flag<-TRUE
+      return(flag)
+    }
+  }
+  return(flag)
 }
 
 is.family.normal<-function(sem.functions){
@@ -537,17 +584,22 @@ summary.pwSEM.class<-function(object,structural.equations=FALSE,...){
   cat("C-statistic:",object$C.statistic,", df =",2*n,
       ", null probability:",object$prob.C.statistic,fill=T,"\n")
   cat("AIC statistic:",object$AIC,fill=T,"\n")
+  #print out structural equations...
   if(structural.equations){
     n.funs<-length(object$sem.functions)
     cat("_______Piecewise Structural Equations__________",fill=T)
     cat("\n")
 
     for(i in 1:n.funs){
+  #if the SEM function is not mixed...
       if(inherits(object$sem.functions[[i]],"gam")){
         for.i<-as.character(object$sem.functions[[i]]$formula)
-        cat("(",i,"):",for.i[2],for.i[1],for.i[3],fill=T)
+        cat("Structural equation ",i,": ",for.i[2],for.i[1],for.i[3],fill=T)
+        cat("\n")
+        #if the function was modified to account for dependent errors...
         if(object$sem.modified[i]=="yes"){
-          cat("The following terms were added to account for dependent errors","\n")
+          cat("\n")
+          cat("NOTE: The following terms were added to account for dependent errors","\n")
           cat("but are not part of your structural equation","\n")
           print(object$excluded.terms[i,
             !is.na(object$excluded.terms[i,])])
@@ -555,34 +607,40 @@ summary.pwSEM.class<-function(object,structural.equations=FALSE,...){
         }
         cat("         Parametric coefficients:",fill=T)
         print(summary(object$sem.functions[[i]])$p.table)
-        cat("         Smoother terms:","\n",fill=T)
-        exclude.rows<-match(row.names(summary(
-          object$sem.functions[[1]])),object$exclude.terms)
-        print(summary(object$sem.functions[[i]])$
-          s.table[exclude.rows,])
-
+        are.smooths<-!is.null(summary(object$sem.functions[[i]])$s.table)
+        if(are.smooths){
+          cat("\n")
+          cat("         Smoother terms:","\n",fill=T)
+          print(summary(object$sem.functions[[i]])$
+            s.table)
+        }
+        #if the function is not mixed & the SEM overall is normal...
         if(is.family.normal(object$sem.functions)){
           cat("\n")
           cat("Since all variables are modelled as normally distributed,","\n")
           cat("here is the standardized structural equation:","\n")
-
           cat("         Parametric coefficients:",fill=T)
           print(summary(object$standardized.sem[[i]])$p.table)
-          cat("         Smoother terms:","\n",fill=T)
-          exclude.rows<-match(row.names(summary(
-            object$standardized.sem[[1]])),object$exclude.terms)
-          print(summary(object$standardized.sem[[i]])$
-                  s.table[exclude.rows,])
-
+          if(are.smooths){
+            cat("\n")
+            cat("         Smoother terms:","\n",fill=T)
+            print(summary(object$standardized.sem[[i]])$
+                  s.table)
+          }
         }
         cat("___________________","\n")
+        cat("\n")
       }
+
+      #if the function is mixed ...
       else{
         for.i<-as.character(object$sem.functions[[i]]$gam$formula)
-        cat("(",i,"):",for.i[2],for.i[1],for.i[3],fill=T)
-
+        cat("Structural equation ",i,": ",for.i[2],for.i[1],for.i[3],fill=T)
+        cat("\n")
+        #if the function was modified due to dependent errors...
         if(object$sem.modified[i]=="yes"){
-          cat("The following terms were added to account for dependent errors","\n")
+          cat("\n")
+          cat("NOTE: The following terms were added to account for dependent errors","\n")
           cat("but are not part of your structural equation","\n")
           print(object$excluded.terms[i,
            !is.na(object$excluded.terms[i,])])
@@ -590,53 +648,43 @@ summary.pwSEM.class<-function(object,structural.equations=FALSE,...){
         }
         cat("         Parametric coefficients:",fill=T)
         print(summary(object$sem.functions[[i]]$gam)$p.table)
-        cat("         Smoother terms:","\n",fill=T)
-        exclude.rows<-match(row.names(summary(
-          object$sem.functions[[1]])),object$exclude.terms)
-        print(summary(object$sem.functions[[i]]$gam)$s.table[exclude.rows,])
-        if(is.family.normal(object$sem.functions)){
+        are.smooths<-!is.null(summary(object$sem.functions[[i]]$gam)$s.table)
+        if(are.smooths){
           cat("\n")
-          cat("Since all variables are modelled as normally distributed,","\n")
-          cat("here is the standardized structural equation:","\n")
-
-          cat("         Parametric coefficients:",fill=T)
-          print(summary(object$standardized.sem[[i]])$p.table)
           cat("         Smoother terms:","\n",fill=T)
-          exclude.rows<-match(row.names(summary(
-            object$standardized.sem[[1]])),object$exclude.terms)
-          print(summary(object$standardized.sem[[i]])$
-                  s.table[exclude.rows,])
-
+          print(summary(object$sem.functions[[i]]$gam)$s.table)
         }
+        #The function is mixed so no standardized values...
         cat("___________________","\n")
+        cat("\n")
       }
     }
+    #finished for(i in 1:nfuns) loop...
     cat("\n")
     n.free<-length(object$dependent.errors)
-    for(ik in 1:n.free){
-      cat("_________ Dependent Errors _________________","\n")
-
-      var.numbers<-1:length(var.names)
+    if(n.free>0){
       for(ij in 1:n.free){
+        cat("          _________ Dependent Errors _________________","\n")
+        dep.var.names<-colnames(object$residual.pearson.matrix)
+        var.numbers<-1:length(var.names)
         print(object$dependent.errors[ij])
         x<-as.character(object$dependent.errors[[ij]][2])
         y<-gsub("~","",as.character(object$dependent.errors[[ij]][3]))
-        x.index<-var.nums[var.names==x]
-        y.index<-var.nums[var.names==y]
+        x.index<-var.nums[dep.var.names==x]
+        y.index<-var.nums[dep.var.names==y]
         if(is.family.normal(object$sem.functions)){
           cat("Pearson correlation: ",
             round(object$residual.pearson.matrix[x.index,y.index],4),"\n")
           cat("Covariance: ",
-              round(object$residual.cov.matrix[x.index,y.index],4),"\n")
+            round(object$residual.cov.matrix[x.index,y.index],4),"\n")
         }
         if(!is.family.normal(object$sem.functions)){
           cat("Spearman correlation: ",
-              round(object$residual.spearman.matrix[x.index,y.index],4),"\n")
+            round(object$residual.spearman.matrix[x.index,y.index],4),"\n")
         }
+      }
     }
 
-
-    }
   }
 }
 
