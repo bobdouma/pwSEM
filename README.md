@@ -1,7 +1,7 @@
 First, make sure that you have the latest version of R on your computer, or at least a very recent version. To install the package from GitHub, type the following commands in your R or RStudio console:
 
 # install package dependencies first
-install.packages("lavaan")
+install.packages("mgcv")
 
 install.packages("ggm")
 
