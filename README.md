@@ -21,7 +21,7 @@ If everything worked, the last command should have opened the help file for the 
 If things do not work
 Step 1
 
-Read the error messages and make sure all packages dependencies are installed and loaded, especially package lavaan and ggm. If a message says that a package could not be loaded, try installing it manually by typing:
+Read the error messages and make sure all packages dependencies are installed and loaded, especially package mgcv and ggm. If a message says that a package could not be loaded, try installing it manually by typing:
 
 # manually installing a dependencies
 install.packages("packagename")
