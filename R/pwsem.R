@@ -472,6 +472,33 @@ get.dag.from.sem<-function(sem.functions){
   do.call(ggm::DAG,args=fo[n.list])
 }
 
+#' basiSet.MAG
+#'
+#' Gets the union basis set of a MAG (mixed acyclic graph) involving either
+#' directed edges (X->Y) if X is a direct cause of Y or bi-directed edges
+#' (X<->Y) if X is not a cause of Y, Y is not a cause of X, but both X
+#' and Y share a common latent cause.  It is easiest to create the MAG
+#' using the DAG() function of the ggm library and then modifying the
+#' binary output matrix by adding a value of 100 for each pair (row & column)
+#' of variables with a bi-directed edge.
+#'
+#' @param
+#' cgraph: the adjacency matrix of the MAG, i.e. a square Boolean
+#' matrix of order equal to the number of nodes of the graph and with
+#' (1) a one in position (i,j) if there is an arrow from i to j;
+#' (2) a 100 in positions (i,j) and (j,i) if there is a double-headed
+#' arrow betweein i and j;
+#' (3) otherwise a zero in position (i,j)
+#' The rownames of the adjacency matrix are the nodes of the MAG.
+#' @return
+#' A list containing the m-separation claims in the union basis set
+#' @export
+#'
+#' @examples
+#' # W->X->Y->Z and X<->Z
+#' mag<-ggm::DAG(X~W,Y~X,Z~Y)
+#' mag[2,3]<-mag[3,2]<-100
+#' basiSet.MAG(mag)
 basiSet.MAG<-function(cgraph){
   #gives the basis set of a DAG or MAG
   #cgraph has existing edges of 0-->1, 100<-->100 or 10--10

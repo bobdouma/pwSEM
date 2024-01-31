@@ -102,3 +102,33 @@ nested_data<-data.frame(year=blue.tits$year,nest=blue.tits$nest,
            XP=blue.tits$protos,XF=blue.tits$frass)
 pairs(nested_data)
 usethis::use_data(nested_data,overwrite = TRUE)
+
+set.seed(101)
+N<-500
+X1<-rnorm(N,0,1)
+X2<-0.5*X1+rnorm(N,0,sqrt(1-0.5^2))
+X3<-0.5*X2+rnorm(N,0,sqrt(1-0.5^2))
+X4<-0.5*X3+rnorm(N,0,sqrt(1-0.5^2))
+dat1<-data.frame(X1,X2,X3,X4)
+model.list<-list(mgcv::gam(X1~1,data=dat1,family=gaussian),
+                 mgcv::gam(X2~X1,data=dat1,family=gaussian),
+                 mgcv::gam(X3~X2,data=dat1,family=gaussian),
+                 mgcv::gam(X4~X3,data=dat1,family=gaussian))
+out<-pwSEM(sem.functions=model.list,data=dat1,use.permutations=FALSE)
+summary(out,structural.equations=TRUE)
+#steps
+mag<-ggm::DAG(X2~X1,X3~X2,X4~X3)
+mag
+bs<-basiSet(mag)
+bs
+r1<-residuals(lm(X1~X2,data=dat1))
+r2<-residuals(lm(X3~X2,data=dat1))
+generalized.covariance(r1,r2)
+perm.generalized.covariance(r1,r2)
+summary(lm(X1~X2+X3,data=dat1))
+r1<-residuals(lm(X1~X3,data=dat1))
+r2<-residuals(lm(X4~X3,data=dat1))
+generalized.covariance(r1,r2)
+r1<-residuals(lm(X2~X1+X3,data=dat1))
+r2<-residuals(lm(X4~X1+X3,data=dat1))
+generalized.covariance(r1,r2)
