@@ -1129,6 +1129,30 @@ get.residuals<-function(my.list,dsep,data,do.smooth,
   data.frame(residuals1=r1,residuals2=r2)
 }
 
+#' Generalized covariance function
+#' @description This function calculates the generalized covariance statistic of
+#' Shah, R.D. & Peters, J. (2020); i.e. Y1 _|_ Y2 |{C}, where C is a set of
+#' common conditioning variables. Typically, R1 and R2 are the residuals
+#' from pairs of regressions of two dependent variables (Y1 and Y2) on
+#'  a set of conditioning variables.
+#'
+#' Shah, R.D. & Peters, J. (2020). The hardness of conditional independence
+#' testing and the generalized covariance measure.  The Annals of Statistics
+#' 48:1514-1538.
+#'
+#' @param R1 a numerical vector of residuals
+#' @param R2 a second numerical vector of residuals
+#'
+#' @return
+#' T.stat: the test statistic, which is asymptotically distributed
+#' as a standard normal variate;
+#'
+#' prob: asymptotic null probability of the T statistic.
+#'
+#' @export
+#'
+#' @examples
+#' generalized.covariance(R1,R2)
 generalized.covariance<-function(R1,R2){
   #generalized covariance measure from Shah, R.D. & Peters,J. 2020.
   #The hardness of conditional independence testing and the generalized
@@ -1145,6 +1169,36 @@ generalized.covariance<-function(R1,R2){
   list(T.stat=T.stat,prob=2*(1-stats::pnorm(abs(T.stat))))
 }
 
+#' perm.generalized.covariance
+#' @description
+#' This performs a permutation version of the generalized covariance test
+#' (see: generalized.covariance), which tests for conditional independence
+#' of two random variables (Y1, Y2)
+#' conditional of a common set of conditioning variables {C}; see
+#' Shah, R.D. & Peters, J. (2020).
+#'  i.e. Y1 _|_ Y2 |{C}. Typically, R1 and R2 are the residuals
+#' from pairs of any type of appropriate regressions of two dependent variables
+#'  (Y1 and Y2) on a set of conditioning variables.
+#'
+#' Shah, R.D. & Peters, J. (2020). The hardness of conditional independence
+#' testing and the generalized covariance measure.  The Annals of Statistics
+#' 48:1514-1538.
+#' @param R1 a numerical vector (typically residuals of the first regression)
+#' @param R2 a numerical vector (typically residuals of the first regression)
+#' @param nperm the number of permutations (defaults to 5000)
+#'
+#' @return
+#' T.stat: The T statistic
+#'
+#' permutation.prob: the estimated null probability of independence of R1
+#' and R2, based on the chosen number of permutations
+#'
+#' lower.95.CI and upper.95.CI: the 95% confidence intervals of the estimated
+#' null probability
+#' @export
+#'
+#' @examples
+#' perm.generalized.covariance(R1, R2, nperm=5000)
 perm.generalized.covariance<-function(R1,R2,nperm=5000){
   #R1, R2 are vectors holding the residuals; i.e. E[function]-observed
   #The R1 vector is permuted each time.
@@ -1161,7 +1215,7 @@ perm.generalized.covariance<-function(R1,R2,nperm=5000){
   prob<-(sum(abs(as.numeric(perm.T))>=abs(T.stat))+1)/length(as.numeric(perm.T))
   CI.prob<-1.96*sqrt((prob*(1-prob)/nperm))
 
-  list(permutation.prob=prob,lower95.CI=prob-CI.prob,upper95.CI=prob+CI.prob)
+  list(T.stat=T.stat,permutation.prob=prob,lower95.CI=prob-CI.prob,upper95.CI=prob+CI.prob)
 }
 
 set.up.info.for.dsep.regressions<-function(fun.list,
