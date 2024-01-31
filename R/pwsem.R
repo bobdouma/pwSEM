@@ -1144,7 +1144,7 @@ get.residuals<-function(my.list,dsep,data,do.smooth,
 #' @param R2 a second numerical vector of residuals
 #'
 #' @return
-#' T.stat: the test statistic, which is asymptotically distributed
+#' T.stat: The test statistic, which is asymptotically distributed
 #' as a standard normal variate;
 #'
 #' prob: asymptotic null probability of the T statistic.
