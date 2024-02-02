@@ -29,5 +29,9 @@ testing and the generalized covariance measure.  The Annals of Statistics
 48:1514-1538.
 }
 \examples{
+#generalized.covariance function: X1_|_X3|{X2}
+R1<-residuals(mgcv::gam(X3~X2,data=sim_normal.no.nesting,family=gaussian))
+R2<-residuals(mgcv::gam(X1~X2,data=sim_normal.no.nesting,family=gaussian))
 generalized.covariance(R1,R2)
+
 }

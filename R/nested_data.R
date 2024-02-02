@@ -14,4 +14,4 @@
 #' \item{HP}{A Guassian variable}
 #' \item{XF}{A Gaussian variable}
 #' }
-"nested.data"
+"nested_data"

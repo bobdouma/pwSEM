@@ -57,9 +57,9 @@ pwSEM.class<-function(x){
 #' dsep.probs, sem.functions,C.statistic, prob.C.statistic,
 #' AIC, n.data.lines, use.permutations, n.perms
 #' @examples
-#' #Example with correlated endogenous errors, normally distributed variables
-#' #and no nesting structure in the data
-#' "sim_normal.no.nesting" is included with this package
+#' # Example with correlated endogenous errors, normally distributed variables
+#' # and no nesting structure in the data
+#' # "sim_normal.no.nesting" is included with this package
 #' # DAG: X1->X2->X3->X4 and X2<->X4
 #' # CREATE A LIST HOLDING THE STRUCTURAL EQUATIONS USING gam()
 #' library(mgcv)
@@ -72,8 +72,8 @@ pwSEM.class<-function(x){
 #'           data=sim_normal.no.nesting,use.permutations = TRUE)
 #' summary(out,structural.equations=TRUE)
 #'
-#' #Example with correlated endogenous errors, Poisson distributed variables
-#' #and no nesting structure in the data
+#' # Example with correlated endogenous errors, Poisson distributed variables
+#' # and no nesting structure in the data
 #' # "sim_poisson.no.nesting" is included with package
 #' # DAG: X1->X2->X3->X4 and X2<->X4
 #' # CREATE A LIST HOLDING THE STRUCTURAL EQUATIONS USING gam()
@@ -82,16 +82,17 @@ pwSEM.class<-function(x){
 #'          mgcv::gam(X2~X1,data=sim_poisson.no.nesting,family=poisson),
 #'          mgcv::gam(X3~X2,data=sim_poisson.no.nesting,family=poisson),
 #'          mgcv::gam(X4~X3,data=sim_poisson.no.nesting,family=poisson))
-#' # RUN THE pwSEM FUNCTION WITH PERMUTATION PROBABILITIES AND INCLUDING THE DEPENDENT ERRORS
+#' # RUN THE pwSEM FUNCTION WITH PERMUTATION PROBABILITIES WITH 10000
+#' # PERMUTATIONS AND INCLUDING THE DEPENDENT ERRORS
 #' out<-pwSEM(sem.functions=my.list,dependent.errors=list(X4~~X2),
-#'           data=sim_poisson.no.nesting,use.permutations = TRUE)
+#'           data=sim_poisson.no.nesting,use.permutations = TRUE,n.perms=10000)
 #' summary(out,structural.equations=TRUE)
 #'
-#' Simulated data with correlated errors involving endogenous
-#' variables, normally-distributed data and with a 2-level grouping
-#' structure and using smoothing splines for the d-separation tests.
-#' Data generated using this mixed acyclic graph:
-#' X1->X2->X3->X4 and X2<->X4
+#' # Simulated data with correlated errors involving endogenous
+#' # variables, normally-distributed data and with a 2-level grouping
+#' # structure and using smoothing splines for the d-separation tests.
+#' # Data generated using this mixed acyclic graph:
+#' # X1->X2->X3->X4 and X2<->X4
 #'
 #' my.list<-list(gamm4::gamm4(X1~1,random=~(1|group),data=sim_normal.with.nesting,family=gaussian),
 #'          gamm4::gamm4(X2~X1,random=~(1|group),data=sim_normal.with.nesting,family=gaussian),
@@ -104,7 +105,7 @@ pwSEM.class<-function(x){
 #' summary(out,structural.equations=TRUE)
 
 #' # Empirical example with normal and binomial data,a 3-level nesting structure
-#'  using "nested_data" (included with this package)
+#'# using "nested_data" (included with this package)
 #' # CREATE A LIST HOLDING THE STRUCTURAL EQUATIONS USING gamm4()
 #' # RUN THE pwSEM FUNCTION WITHOUT PERMUTATION PROBABILITIES AND INCLUDING THE DEPENDENT ERRORS
 #' library(gamm4)
@@ -1179,7 +1180,11 @@ get.residuals<-function(my.list,dsep,data,do.smooth,
 #' @export
 #'
 #' @examples
+#' #generalized.covariance function: X1_|_X3|{X2}
+#' R1<-residuals(mgcv::gam(X3~X2,data=sim_normal.no.nesting,family=gaussian))
+#' R2<-residuals(mgcv::gam(X1~X2,data=sim_normal.no.nesting,family=gaussian))
 #' generalized.covariance(R1,R2)
+#'
 generalized.covariance<-function(R1,R2){
   #generalized covariance measure from Shah, R.D. & Peters,J. 2020.
   #The hardness of conditional independence testing and the generalized
@@ -1225,7 +1230,13 @@ generalized.covariance<-function(R1,R2){
 #' @export
 #'
 #' @examples
-#' perm.generalized.covariance(R1, R2, nperm=5000)
+#' R1<-residuals(mgcv::gam(X3~X2,data=sim_normal.no.nesting,family=gaussian))
+#' R2<-residuals(mgcv::gam(X1~X2,data=sim_normal.no.nesting,family=gaussian))
+#'
+#' #perm.generalized.covariance function
+#' perm.generalized.covariance(R1,R2,nperm=5000)
+#'
+
 perm.generalized.covariance<-function(R1,R2,nperm=5000){
   #R1, R2 are vectors holding the residuals; i.e. E[function]-observed
   #The R1 vector is permuted each time.

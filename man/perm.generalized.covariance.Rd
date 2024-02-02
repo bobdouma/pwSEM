@@ -37,5 +37,10 @@ testing and the generalized covariance measure.  The Annals of Statistics
 48:1514-1538.
 }
 \examples{
-perm.generalized.covariance(R1, R2, nperm=5000)
+R1<-residuals(mgcv::gam(X3~X2,data=sim_normal.no.nesting,family=gaussian))
+R2<-residuals(mgcv::gam(X1~X2,data=sim_normal.no.nesting,family=gaussian))
+
+#perm.generalized.covariance function
+perm.generalized.covariance(R1,R2,nperm=5000)
+
 }
