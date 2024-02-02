@@ -1,4 +1,4 @@
-#' sim_normal.no.nesting:
+#' sim_normal.no.nesting
 #' Simulated data with correlated errors involving endogenous
 #' variables, normally-distributed data and without any grouping structure
 #' Data generated using this mixed acyclic graph:

@@ -247,10 +247,10 @@ get.unbiased.sems<-function(sem.functions,mag,equivalent.mag,
   #ncol is the number of variables in the mag
   for(i in 1:ncol){
     if(inherits(sem.functions[[i]],"gam")){
-      hold.dep.var.name[i]<-as.character(formula(sem.functions[[i]])[2])
+      hold.dep.var.name[i]<-as.character(stats::formula(sem.functions[[i]])[2])
     }
     if(!inherits(sem.functions[[i]],"gam")){
-      hold.dep.var.name[i]<-as.character(formula(sem.functions[[i]]$gam)[2])
+      hold.dep.var.name[i]<-as.character(stats::formula(sem.functions[[i]]$gam)[2])
     }
 
     #Compare the mag and equivalent.mag for this variable, after
@@ -270,11 +270,11 @@ get.unbiased.sems<-function(sem.functions,mag,equivalent.mag,
 #deviation of individual observations from the fixed effects plus the
 #random effects".
       if(inherits(sem.functions[i][[1]],"gam")){
-        residual.values[,i]<-residuals(sem.functions[[i]],
+        residual.values[,i]<-stats::residuals(sem.functions[[i]],
                                        type="response")
       }
       else{
-        residual.values[,i]<-residuals(sem.functions[[i]]$mer,
+        residual.values[,i]<-stats::residuals(sem.functions[[i]]$mer,
                                      type="response")
       }
     }
@@ -303,10 +303,10 @@ get.unbiased.sems<-function(sem.functions,mag,equivalent.mag,
         data=dat)
 #Now, calculate dependent errors
       if(inherits(sem.functions[[i]],"gam"))
-      pred.i<-predict(sem.functions[[i]],exclude=exclude.terms,
+      pred.i<-stats::predict(sem.functions[[i]],exclude=exclude.terms,
                       type="response")
       if(!inherits(sem.functions[[i]],"gam")){
-        pred.i<-predict(sem.functions[[i]]$gam,exclude=exclude.terms,
+        pred.i<-stats::predict(sem.functions[[i]]$gam,exclude=exclude.terms,
                         type="response")
       }
 
@@ -329,12 +329,12 @@ get.unbiased.sems<-function(sem.functions,mag,equivalent.mag,
                                   hold.dep.var.name)
 #Only get Pearson's r and covariance if all variables are normal
   if(is.normal){
-    cov.matrix<-var(residual.values)
-    pearson.matrix<-cor(residual.values)
+    cov.matrix<-stats::var(residual.values)
+    pearson.matrix<-stats::cor(residual.values)
   }
   #else, just calculate a Spearman r
   if(!is.normal){
-    spearman.matrix<-cor(residual.values,method="spearman")
+    spearman.matrix<-stats::cor(residual.values,method="spearman")
   }
 
 #If all data are normal, get the standardized coefficients
@@ -375,12 +375,12 @@ update.fun<-function(sem.functions,i,all.grouping.vars,add.terms,data){
   if(inherits(sem.functions[[i]],"gam")){
     if(!is.null(add.terms)){
       if(add.terms=="none"){
-        return(update(sem.functions[[i]],
+        return(stats::update(sem.functions[[i]],
               formula=paste("~."),data=data))
       }
 
       if(add.terms!="none"){
-        return(update(sem.functions[[i]],
+        return(stats::update(sem.functions[[i]],
           formula=paste("~. + ",add.terms),data=data))
       }
     }
@@ -395,7 +395,7 @@ update.fun<-function(sem.functions,i,all.grouping.vars,add.terms,data){
         new.fo<-paste(old.fo[2],old.fo[1],old.fo[3])
       if(add.terms!="none")
         new.fo<-paste(old.fo[2],old.fo[1],old.fo[3],"+",add.terms)
-      fit<-gamm4::gamm4(formula=as.formula(new.fo),random=info$random[[i]],
+      fit<-gamm4::gamm4(formula=stats::as.formula(new.fo),random=info$random[[i]],
                         family=info$family[[i]],data=data)
       return(fit)
     }
@@ -482,8 +482,8 @@ get.dag.from.sem<-function(sem.functions){
 #' binary output matrix by adding a value of 100 for each pair (row & column)
 #' of variables with a bi-directed edge.
 #'
-#' @param
-#' cgraph: the adjacency matrix of the MAG, i.e. a square Boolean
+#' @param cgraph
+#' The adjacency matrix of the MAG, i.e. a square Boolean
 #' matrix of order equal to the number of nodes of the graph and with
 #' (1) a one in position (i,j) if there is an arrow from i to j;
 #' (2) a 100 in positions (i,j) and (j,i) if there is a double-headed

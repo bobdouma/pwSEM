@@ -7,7 +7,7 @@
 basiSet.MAG(cgraph)
 }
 \arguments{
-\item{cgraph:}{the adjacency matrix of the MAG, i.e. a square Boolean
+\item{cgraph}{The adjacency matrix of the MAG, i.e. a square Boolean
 matrix of order equal to the number of nodes of the graph and with
 (1) a one in position (i,j) if there is an arrow from i to j;
 (2) a 100 in positions (i,j) and (j,i) if there is a double-headed

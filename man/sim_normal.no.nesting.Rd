@@ -3,7 +3,7 @@
 \docType{data}
 \name{sim_normal.no.nesting}
 \alias{sim_normal.no.nesting}
-\title{sim_normal.no.nesting:
+\title{sim_normal.no.nesting
 Simulated data with correlated errors involving endogenous
 variables, normally-distributed data and without any grouping structure
 Data generated using this mixed acyclic graph:
@@ -24,7 +24,7 @@ A data set with 100 rows and 4 columns
 sim_normal.no.nesting
 }
 \description{
-sim_normal.no.nesting:
+sim_normal.no.nesting
 Simulated data with correlated errors involving endogenous
 variables, normally-distributed data and without any grouping structure
 Data generated using this mixed acyclic graph:
