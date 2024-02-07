@@ -101,7 +101,7 @@ pwSEM.class<-function(x){
 #' # RUN THE pwSEM FUNCTION WITH PERMUTATION PROBABILITIES AND INCLUDING THE DEPENDENT ERRORS
 #' out<-pwSEM(sem.functions=my.list,dependent.errors=list(X4~~X2),
 #'           data=sim_normal.with.nesting,use.permutations = TRUE,
-#'           do.smooth=FALSE,all.grouping.vars=c("group"))
+#'           do.smooth=TRUE,all.grouping.vars=c("group"))
 #' summary(out,structural.equations=TRUE)
 
 #' # Empirical example with normal and binomial data,a 3-level nesting structure
@@ -199,7 +199,7 @@ pwSEM<-function(sem.functions,dependent.errors=NULL,data,
             new.sems$excluded.terms,dependent.errors=
             dependent.errors,response.residuals=
             new.sems$residual.values)
-#IS THE AIC STATISTIC CALCULATED CORRECTLY???
+#The AIC statistic is based on the sems of the equivalent mag
     class(x)<-"pwSEM.class"
   x<-pwSEM.class(x)
   x

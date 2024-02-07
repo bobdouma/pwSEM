@@ -16,7 +16,10 @@ Imports:
     ggm,
     mgcv
 Suggests:
+    knitr,
+    rmarkdown,
     testthat
 Depends: 
     R (>= 2.10)
 LazyData: true
+VignetteBuilder: knitr

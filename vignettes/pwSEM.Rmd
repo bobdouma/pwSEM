@@ -1,0 +1,116 @@
+---
+title: "pwSEM"
+output: rmarkdown::html_vignette
+vignette: >
+  %\VignetteIndexEntry{pwSEM}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+```{r, include = FALSE}
+knitr::opts_chunk$set(
+  collapse = TRUE,
+  comment = "#>"
+)
+```
+
+```{r setup}
+library(pwSEM)
+```
+# Introduction
+The pwSEM package contains functions for conducting piecewise structural equation modelling (SEM).  There are three main functions that user's will typically use: pwSEM(), generalized.covariance() and perm.generalized.covariance().  Only pwSEM() is required unless you want to conduct each of the steps of the method yourself.
+
+## Some technical details
+1. The null probabilities associated with each of the d-separation claims in the union basis set of your causal model are based on the generalized covariance statistic of Shah, R.D. & Peters, J. (2020)  The hardness of conditional independence testing and the generalized covariance measure.  The Annals of Statistics 48:1514-1538.  The generalized.covariance() function of this package calculates this statistic and its asymptotic null probability.  A permutation version of this test is available in the perm.generalized.covariance() function for small data sets (<= about 100 observations).
+2. Given a d-separation claim: X1 _||_X2|{C}, where C is the set of causal parents of either X1 or X2,  the generalized covariance statistic consists of conducting two regressions (X1~C and X2~C),  getting the residuals from these two regressions, and then inputting these two vectors of residuals to calculate the generalized covariance statistic.  These regressions can be of any type that are appropriate given the nature of the dependent variables (X1, X2) and the assumed functional form linking them to the causal parents.  The pwSEM() function uses the "response" residuals that are returned from either the gam() or gamm4() functions of the mgcv package.
+3. Although the current version of pwSEM allows for generalized linear or mixed generalized linear fits when testing the d-separation claims, it can also accommodate generalized additive or mixed generalized additive fits when testing the d-separation claims via the "do.smooth=TRUE" argument.  However, the current version of pwSEM uses the default values for smoother terms and it is possible that the default number of knots chosen might be higher than the specified maximum degrees of freedom; in this case an error message will be produced.  The only solution right now is to do the d-separation tests outside of pwSEM via the generalized.covariance function.
+4. If all of the variables in your SEM are normally distributed, then you can also obtain the fits based on standardized variables, resulting in standardized path coefficients.  If any of your variables assume a non-normal distribution then standardized fits are not returned.
+5.The AIC statistic is calculated using the structural equations specified in the equivalent MAG if the equivalent MAG differs from your original causal model.  The AIC statistic is given in Shipley, B. & Douma, J.(2020). Generalized AIC and chi-squared statistics for path models consistent with directed acyclic graphs.  Ecology 101:e02960.
+
+## pwSEM
+There are three main steps required to fit and output the results of a piecewise SEM:
+
+1. Create a list containing all of the structural equations, following your causal hypothesis (DAG).  Note that any dependent errors are not included in this first step.  Note also that you must include the structural equations for all of the exogenous variables as well.  People often forget this and, if you do, it will result in an error message.  These structural equations are constructed using either the gam() or the gamm4() functions of the mgcv package; see Wood, S.N. (2017).  Generalized Additive Models: An introduction with R (2nd edition).  CRC Press (Chapman & Hall).
+2. Create output from the pwSEM() function by inputting (1) your list (from step 1), (2) a list of dependent errors (if any), (3) the data set that will be used to fit the data (this must be the same as given inside the gam or gamm4 calls from step 1),  (4) whether you want to use asymptotic probabilities of the d-separation claims or permutation probabilities (for small sample sizes of approximately <100), and (5) how many permutations you require (defaults to 5000).  Note that permutation probabilities will slow down the pwSEM() function.
+3. The output from step 2 contains many objects resulting from the fit, but it is more convenient to use the summary() function to output the results.  Use the argument "structural.equations=TRUE" if you also want the fits of the structural equations to be output.
+
+### Example 1: correlated endogenous errors, normally distributed variables and no nesting structure in the data
+
+Consider first a causal hypothesis in which X1-->X2-->X3-->X4 and with dependent errors between X2 and X4.  If we assume that all four variables are normally distributed, linearly related, and with mutually independent observations (i.e. no nesting structure that would require a mixed model formulation), then we can model the structural equations using the gam() function of the mgcv package without any smoother terms.  For instance, the first link (X1-->X2) would be modelled as gam(X2~X1,data=...,family=gaussian).  This version of gam is equivalent to the lm() function that is well-known to R users: lm(X2~X1,data=...).  As a note, if you believe that the functional relationship between X2 and X1 is nonlinear, you could instead model this as gam(X2~s(X1),data=...,family=gaussian).  The pwSEM() function will accomodate this formulation but cannot include more complicated formulations like changing the number of knots such as gam(X2~s(X1,k=4),data=...,family=gaussian).  
+
+Here are the three steps, using the "sim_normal.no.nesting" data set that is included with the pwSEM package:
+
+
+
+STEP 1: Create a list containing the structural equations
+
+```{r}
+my.list<-list(mgcv::gam(X1~1,data=sim_normal.no.nesting,family=gaussian),
+         mgcv::gam(X2~X1,data=sim_normal.no.nesting,family=gaussian),
+         mgcv::gam(X3~X2,data=sim_normal.no.nesting,family=gaussian),
+         mgcv::gam(X4~X3,data=sim_normal.no.nesting,family=gaussian))
+```
+
+
+Notice that the first element of the list models X1, which is an exogenous variable.  Since X1 is not caused by any other observed variable, it has no predictor variables and so only includes the intercept.  YOU MUST ALWAYS EXPLICITLY INCLUDE ALL OF THE EXOGENOUS VARIABLES IN THIS WAY.
+
+STEP 2: call the pwSEM function
+
+```{r}
+out<-pwSEM(sem.functions=my.list,dependent.errors=list(X4~~X2),
+          data=sim_normal.no.nesting,use.permutations = TRUE,n.perms=5000,do.smooth=FALSE,all.grouping.vars = NULL)
+```
+
+The first argument gives the list containing the structural equations.
+
+The second argument gives a list containing any dependent errors using the ~~ operator to specify these.  In our example there are dependent errors between X4 and X2.  If this argument is not given then the default is to assume no dependent errors.  If there are more than one pair of dependent errors then you would include each in the list, separated by a comma.
+
+The third argument gives the name of the data set to be used when fitting the structural equations and this must the same name as specified in step 1.
+
+The fourth argument specifies if you want to use the asymptotic probability values of the generalized covariance statistic (the default) or the permutation probabilities.
+
+The fifth argument gives the number of permutations required for the permutation version (defaults to 5000).
+
+The sixth argument takes a logical value (TRUE/FALSE) specifying if you want to use regression smoothers (thus generalized additive or mixed generalized additive models) when getting the residuals for the d-separation tests.  The default is FALSE.  Note that only the default number of knots chosen by gam() or gamm4() can be used by pwSEM, and this might throw up an error message. 
+
+STEP 3: call the summary
+
+```{r}
+summary(out,structural.equations=TRUE)
+```
+
+
+This outputs the causal graph and (if it differs from the original causal graph) the equivalent MAG.  Next are the d-separation claims of the union basis set and then the  null probabilities of each d-separation claim. Next are the Fisher's C statistic,  its degrees of freedom and associated null probability, and the AIC statistic.
+If you include the argument "structural.equations=TRUE" then the fitted regressions of the structural equations are also output.  If all of the variables are normally distributed (as is the case here) then the standardized versions of the structural equations are also output. Note that, when the equivalent MAG or DAG differs from the original causal graph (as happens in this example), the structural equation of the equivalent graph is output and the added terms in the equivalent structural equation are noted in the output.  When reporting and interpreting the SEM you would ignore the slopes of these added terms.
+Finally, if there are dependent errors, then the covariances and Pearson correlations of these dependent errors are output if the variables are normally distributed (as is the case in this example) or the Spearman correlations otherwise.
+
+### Example 2: correlated endogenous errors, Poisson distributed variables and no nesting structure in the data
+
+The only difference with the first example is in changing the "family=" argument in the gam() function.  Everything else remains the same.
+```{r}
+my.list<-list(mgcv::gam(X1~1,data=sim_poisson.no.nesting,family=gaussian),
+         mgcv::gam(X2~X1,data=sim_poisson.no.nesting,family=poisson),
+         mgcv::gam(X3~X2,data=sim_poisson.no.nesting,family=poisson),
+         mgcv::gam(X4~X3,data=sim_poisson.no.nesting,family=poisson))
+out<-pwSEM(sem.functions=my.list,dependent.errors=list(X4~~X2),
+          data=sim_poisson.no.nesting,use.permutations = TRUE,n.perms=10000)
+summary(out,structural.equations=TRUE)
+```
+Since each dependent variable in the model is now Poisson distributed, the slopes of the structural equations are for the ln-transformed values since this is the link function for Poisson distributed variables in a generalized linear model.  If you want to express the structural equations in the original scale of these variables, you must back-transform.  For example, the second structural equation is (implicitly) ln(X2)=0.25+0.17X1 even though the ln-transform isn't explicit.  To get this structural equation in the original scale of X2 you would do: exp(0.25)*exp(0.17X1).
+Note that the Spearman correlation between the residuals of X4 and X2 (on their original scale) is reported rather than a covariance and Pearson correlation since the variables are not normally distributed.
+
+### Example 3: dependent errors involving endogenous variables, normally-distributed data and with a 2-level grouping structure and using smoothing splines for the d-separation tests
+
+This third example used generalized linear mixed models via the gamm4() function of the mgcv package.  In this case, your data set must include variables that give the random components of the model, thus the nesting structure; here, there is a variable called "group" to give the random component. You must also now include the "all.grouping.vars=" argument in the pwSEM() function, giving all of the variables that define the random component.  Furthermore, we allow potentially nonlinear functions, via generalized additive mixed models, to test the d-separation claims via the "do.smooth=TRUE" argument.  
+```{r}
+my.list<-list(gamm4::gamm4(X1~1,random=~(1|group),data=sim_normal.with.nesting,family=gaussian),
+         gamm4::gamm4(X2~X1,random=~(1|group),data=sim_normal.with.nesting,family=gaussian),
+         gamm4::gamm4(X3~X2,random=~(1|group),data=sim_normal.with.nesting,family=gaussian),
+         gamm4::gamm4(X4~X3,random=~(1|group),data=sim_normal.with.nesting,family=gaussian))
+
+out<-pwSEM(sem.functions=my.list,dependent.errors=list(X4~~X2),
+          data=sim_normal.with.nesting,use.permutations = TRUE,
+          do.smooth=TRUE,all.grouping.vars=c("group"))
+summary(out,structural.equations=TRUE)
+```
+

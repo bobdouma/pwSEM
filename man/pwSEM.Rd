@@ -99,7 +99,7 @@ my.list<-list(gamm4::gamm4(X1~1,random=~(1|group),data=sim_normal.with.nesting,f
 # RUN THE pwSEM FUNCTION WITH PERMUTATION PROBABILITIES AND INCLUDING THE DEPENDENT ERRORS
 out<-pwSEM(sem.functions=my.list,dependent.errors=list(X4~~X2),
           data=sim_normal.with.nesting,use.permutations = TRUE,
-          do.smooth=FALSE,all.grouping.vars=c("group"))
+          do.smooth=TRUE,all.grouping.vars=c("group"))
 summary(out,structural.equations=TRUE)
 # Empirical example with normal and binomial data,a 3-level nesting structure
 # using "nested_data" (included with this package)
