@@ -153,7 +153,7 @@ Wood, S.N. (2017).  Generalized Additive Models: An introduction with R, 2nd edi
 ## generalized covariance function and its permutation version
 
 The pwSEM package also includes two functions to calculate the generalized covariance statistic of and its null probability.  The first is called "generalized.covariance" and the second is called "perm.generalized covariance".
-The first one, generalized.covariance(), produces asymptotic null probabilities based on a standard normal distribution, and is appropriate for larger sample sizes.  How large?  Simulations suggest that you need at least 100 observations, but these simulations are not exhaustive.
+The first one, generalized.covariance(), produces asymptotic null probabilities based on a standard normal distribution, and is appropriate for larger sample sizes.  How large?  Simulations suggest that you need at least 100 observations, but these simulations are not exhaustive.  However, the permutation version is quite fast and so you can instead use the permutation version if you are in doubt.
 The second one, perm.generalized.covariance(), produces an empirical permutation distribution of the generalized covariance statistic rather than assuming a standard normal distribution. See Manly, B.F.J. (1997) Randomization, Bootstrap and Monte Carlo Methods in Biology, 2nd edition.  Chapman & Hall.  The default number of permutations is 5000, and this should be fine for most situations, but you can change this via the nperm= argument.  The larger the number of permutations, the more precise the probability estimate, but also the longer it takes.
 If we again use the sim_poisson.no.nesting data set, and want to test the conditional independence of X1 and X3, given X2 then here is how to do it.
 
