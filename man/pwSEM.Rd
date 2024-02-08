@@ -115,4 +115,6 @@ summary(pwSEM(sem.functions=my.list,data=nested_data,
       use.permutations=FALSE,do.smooth=FALSE,dependent.errors=list(XP~~XF),
       all.grouping.vars=c("nest","year")))
 
+# see vignette("pwSEM")
+
 }
