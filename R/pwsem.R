@@ -304,6 +304,7 @@ get.unbiased.sems<-function(sem.functions,mag,equivalent.mag,
         data=dat)
 #Now, calculate dependent errors
       if(inherits(sem.functions[[i]],"gam"))
+#Calculate the predicted values on the original scale of the variable
       pred.i<-stats::predict(sem.functions[[i]],exclude=exclude.terms,
                       type="response")
       if(!inherits(sem.functions[[i]],"gam")){
@@ -1138,21 +1139,26 @@ get.residuals<-function(my.list,dsep,data,do.smooth,
   #if n.levels==0 then use gam, since no nesting structure
   #if n.levels>0 then use gamm for X
   if(n.levels1==0){
+# The default type of residuals for gam is "deviance"
+# For normal variables, this is the same as "response" residuals
     r1<-stats::residuals(mgcv::gam(formula=fo$formula1,family=info$family[[v1]],data=data))
   }
   if(n.levels2==0){
     r2<-stats::residuals(mgcv::gam(formula=fo$formula2,family=info$family[[v2]],data=data))
   }
+# The default type of residuals form gamm4 are conditional deviance
+# residuals.  The conditional deviance is a measure of the lack of fit of the model to the
+# data, accounting for both fixed and random effects (ChatGPT 3.5)
   if(n.levels1>0){
     fit<-gamm4::gamm4(formula=fo$formula1,random=info$random[[v1]],
                family=info$family[[v1]],data=data)
-    r1<-stats::residuals(fit$mer,type="response")
+    r1<-stats::residuals(fit$mer,type="deviance")
   }
   if(n.levels2>0){
     fit<-gamm4::gamm4(formula=fo$formula2,random=info$random[[v2]],
                family=info$family[[v2]],
                data=data)
-    r2<-stats::residuals(fit$mer,type="response")
+    r2<-stats::residuals(fit$mer,type="deviance")
   }
   data.frame(residuals1=r1,residuals2=r2)
 }
