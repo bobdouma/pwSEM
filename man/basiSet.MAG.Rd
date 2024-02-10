@@ -29,7 +29,9 @@ of variables with a bi-directed edge.
 }
 \examples{
 # W->X->Y->Z and X<->Z
+# Create the DAG skeleton
 mag<-ggm::DAG(X~W,Y~X,Z~Y)
+# Add the dependent error
 mag[2,3]<-mag[3,2]<-100
 basiSet.MAG(mag)
 }
