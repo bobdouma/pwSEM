@@ -162,3 +162,118 @@ perm.generalized.covariance(R1,R2,nperm=10000)
 -2*log(0.5545)
 1-pchisq(1.1794,2)
 summary(mgcv::gam(X3~X2+X1,data=sim_poisson.no.nesting,family=poisson))
+
+# Case 1 of Appendix 1 of MEE paper
+set.seed(99)
+N<-c(10,50,100,200,500,1000)
+nsim<-5000
+p<-matrix(NA,nrow=nsim,ncol=6)
+for(j in 1:nsim){
+  for(i in 1:6){
+    X2<-rnorm(N[i])
+    X1<-0.5*X2+rnorm(N[i],0,sqrt(1-0.5^2))
+    X3<-0.5*X2+rnorm(N[i],0,sqrt(1-0.5^2))
+    r1<-residuals(mgcv::gam(X1~X2))
+    r2<-residuals(mgcv::gam(X3~X2))
+    p[j,i]<-generalized.covariance(r1,r2)$prob
+  }
+}
+for(i in 1:6){
+    print(round(quantile(p[,i],probs=c(0.025,0.05,0.1,0.5)),4))
+}
+
+# Case 2 of Appendix 1 of MEE paper
+#X1<--X2-->X3
+set.seed(99)
+X2<-rchisq(10000,2)
+X1<-rpois(10000,0.5*X2)
+X3<-rpois(10000,0.5*X2)
+fit1<-mgcv::gam(X1~s(X2),family="poisson")
+fit2<-mgcv::gam(X3~s(X2),family="poisson")
+summary(mgcv::gam(X1~X2+X3,family="poisson"))
+summary(mgcv::gam(X3~X2+X1,family="poisson"))
+#Without smooths...
+fit1<-mgcv::gam(X1~X2,family="poisson")
+fit2<-mgcv::gam(X3~X2,family="poisson")
+plot(residuals(fit1,type="response")~residuals(fit2,type="response"))
+generalized.covariance(residuals(fit1,type="response"),residuals(fit2,type="response"))
+#p=0.057
+#with smooths using defaults...
+fit1<-mgcv::gam(X1~s(X2),family="poisson")
+fit2<-mgcv::gam(X3~s(X2),family="poisson")
+plot(residuals(fit1,type="response")~residuals(fit2,type="response"))
+generalized.covariance(residuals(fit1,type="response"),residuals(fit2,type="response"))
+#p=0.42
+#with smooths using more knots...
+#k=3, p=0.55
+#k=5, p=0.10
+#k=10 (default), p=0.42
+#k=15, p=0.48
+#k=20, p=0.47
+#k=30, p=0.53
+#k=50, p=0.53
+#k=70, p=0.52
+fit1<-mgcv::gam(X1~s(X2,k=10),family="poisson")
+fit2<-mgcv::gam(X3~s(X2,k=10),family="poisson")
+plot(residuals(fit1,type="response")~residuals(fit2,type="response"))
+generalized.covariance(residuals(fit1,type="response"),residuals(fit2,type="response"))
+#p=0.42
+#Using their regression as gam...
+gcm.test(X=X1,Y=X3,Z=X2,regr.method="gam",plot.residuals = TRUE)
+#p=0.49
+
+set.seed(99)
+N<-c(10,50,100,200)
+nsim<-1000
+p<-p1<-p2<-p3<-p4<-matrix(NA,nrow=nsim,ncol=length(N))
+for(j in 1:nsim){
+  for(i in 1:length(N)){
+#testing increasing k with N
+    k.max<-max(4,round(sqrt(N[i]),0))
+    k.max<-min(k.max,20)
+    X2<-rchisq(N[i],2)
+    X1<-rpois(N[i],0.5*X2)
+    X3<-rpois(N[i],0.5*X2)
+#testing Lefcheck method
+    fit1<-mgcv::gam(X1~X2+X3,family="poisson",control=mgcv::gam.control(maxit=1000))
+    fit2<-mgcv::gam(X3~X2+X1,family="poisson",control=mgcv::gam.control(maxit=1000))
+    p2[j,i]<-max(summary(fit1)$p.table[3,4],summary(fit2)$p.table[3,4],na.rm=TRUE)
+    p3[j,i]<-min(summary(fit1)$p.table[3,4],summary(fit2)$p.table[3,4],na.rm=TRUE)
+#testing with no smoothing
+    r1<-residuals(mgcv::gam(X1~X2,family="poisson"),type="response")
+    r2<-residuals(mgcv::gam(X3~X2,family="poisson"),type="response")
+    p4[j,i]<-generalized.covariance(r1,r2)$prob
+#testing with smoothing and varying smoother edf
+    r1<-residuals(mgcv::gam(X1~s(X2,k=k.max),family="poisson"),type="response")
+    r2<-residuals(mgcv::gam(X3~s(X2,k=k.max),family="poisson"),type="response")
+    p[j,i]<-generalized.covariance(r1,r2)$prob
+#testing with smoothing and default smoother edf
+    r1<-residuals(mgcv::gam(X1~s(X2),family="poisson"),type="response")
+    r2<-residuals(mgcv::gam(X3~s(X2),family="poisson"),type="response")
+    p1[j,i]<-generalized.covariance(r1,r2)$prob
+  }
+}
+#using generalized.covariance with k varying
+for(i in 1:length(N)){
+  print(round(quantile(p[,i],probs=c(0.025,0.05,0.1,0.5,0.975)),4))
+}
+#using generalized.covariance with default k
+for(i in 1:length(N)){
+  print(round(quantile(p1[,i],probs=c(0.025,0.05,0.1,0.5,0.975)),4))
+}
+#using generalized.covariance with no smoothing
+for(i in 1:length(N)){
+  print(round(quantile(p4[,i],probs=c(0.025,0.05,0.1,0.5,0.975)),4))
+}
+#using maximum prob from two regressions
+for(i in 1:length(N)){
+  print(round(quantile(p2[,i],probs=c(0.025,0.05,0.1,0.5,0.975),na.rm=TRUE),4))
+}
+#using minimum prob from two regressions
+for(i in 1:length(N)){
+  print(round(quantile(p3[,i],probs=c(0.025,0.05,0.1,0.5,0.975),na.rm=TRUE),4))
+}
+plot(p[,4]~p2[,4])
+
+
+
