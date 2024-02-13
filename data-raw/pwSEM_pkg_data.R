@@ -185,17 +185,16 @@ for(i in 1:6){
 # Case 2 of Appendix 1 of MEE paper
 #X1<--X2-->X3
 set.seed(99)
-X2<-rchisq(10000,2)
-X1<-rpois(10000,0.5*X2)
-X3<-rpois(10000,0.5*X2)
-fit1<-mgcv::gam(X1~s(X2),family="poisson")
-fit2<-mgcv::gam(X3~s(X2),family="poisson")
-summary(mgcv::gam(X1~X2+X3,family="poisson"))
-summary(mgcv::gam(X3~X2+X1,family="poisson"))
+
+X2.C<-rchisq(200,2)
+X1<-rpois(200,0.5*X2)
+X3<-rpois(200,0.5*X2)
+
 #Without smooths...
-fit1<-mgcv::gam(X1~X2,family="poisson")
+fit1<-mgcv::gam(X1~X2+X3,family="poisson",
+                gam.control(epsilon=1e-8,maxit=1000))
+summary(fit1)
 fit2<-mgcv::gam(X3~X2,family="poisson")
-plot(residuals(fit1,type="response")~residuals(fit2,type="response"))
 generalized.covariance(residuals(fit1,type="response"),residuals(fit2,type="response"))
 #p=0.057
 #with smooths using defaults...
@@ -222,58 +221,123 @@ generalized.covariance(residuals(fit1,type="response"),residuals(fit2,type="resp
 gcm.test(X=X1,Y=X3,Z=X2,regr.method="gam",plot.residuals = TRUE)
 #p=0.49
 
-set.seed(99)
+set.seed(100)
 N<-c(10,50,100,200)
 nsim<-1000
-p<-p1<-p2<-p3<-p4<-matrix(NA,nrow=nsim,ncol=length(N))
+Nslopes.max<-Nslopes.min<-Pslopes.max<-Pslopes.min<-Bslopes.max<-
+  Bslopes.min<-Nglm<-Pglm<-Bglm<-Ngam<-Pgam<-Bgam<-NgamS<-
+  PgamS<-BgamS<-matrix(NA,nrow=nsim,ncol=length(N))
 for(j in 1:nsim){
+  print(paste("nsim=",j))
   for(i in 1:length(N)){
 #testing increasing k with N
-    k.max<-max(4,round(sqrt(N[i]),0))
+
+    k.max<-max(9,round(N[i]/10,0))
     k.max<-min(k.max,20)
-    X2<-rchisq(N[i],2)
-    X1<-rpois(N[i],0.5*X2)
-    X3<-rpois(N[i],0.5*X2)
-#testing Lefcheck method
-    fit1<-mgcv::gam(X1~X2+X3,family="poisson",control=mgcv::gam.control(maxit=1000))
-    fit2<-mgcv::gam(X3~X2+X1,family="poisson",control=mgcv::gam.control(maxit=1000))
-    p2[j,i]<-max(summary(fit1)$p.table[3,4],summary(fit2)$p.table[3,4],na.rm=TRUE)
-    p3[j,i]<-min(summary(fit1)$p.table[3,4],summary(fit2)$p.table[3,4],na.rm=TRUE)
-#testing with no smoothing
-    r1<-residuals(mgcv::gam(X1~X2,family="poisson"),type="response")
-    r2<-residuals(mgcv::gam(X3~X2,family="poisson"),type="response")
-    p4[j,i]<-generalized.covariance(r1,r2)$prob
-#testing with smoothing and varying smoother edf
-    r1<-residuals(mgcv::gam(X1~s(X2,k=k.max),family="poisson"),type="response")
-    r2<-residuals(mgcv::gam(X3~s(X2,k=k.max),family="poisson"),type="response")
-    p[j,i]<-generalized.covariance(r1,r2)$prob
+#Poisson variates require a strictly positive value of X2 (X2.C)
+#Normal or Binomial variates can use +/- values of X2 (X2.N)
+    X2.C<-rchisq(N[i],2)
+    X2.N<-rnorm(N[i])
+#Now generate values for X1...
+    X1.N<-rnorm(N[i],0.5*X2.N)
+    X1.P<-rpois(N[i],0.5*X2.C)
+#Logistic function linking p to  X2 for binomial distribution
+    logistic<-exp(0.5*X2.N)/(1+exp(0.5*X2.N))
+    X1.B<-rbinom(N[i],size=1,prob=logistic)
+#Now generate values for X3...
+    X3.N<-rnorm(N[i],0.5*X2.N)
+    X3.P<-rpois(N[i],0.5*X2.C)
+    X3.B<-rbinom(N[i],size=1,prob=logistic)
+#
+#testing partial slope=0 method
+    #dependent normal
+    Nfit1<-mgcv::gam(X1.N~X2.N+X3.N,family="gaussian",control=mgcv::gam.control(maxit=1000))
+    Nfit2<-mgcv::gam(X3.N~X2.N+X1.N,family="gaussian",control=mgcv::gam.control(maxit=1000))
+    Nslopes.max[j,i]<-max(summary(Nfit1)$p.table[3,4],summary(Nfit2)$p.table[3,4],na.rm=TRUE)
+    Nslopes.min[j,i]<-min(summary(Nfit1)$p.table[3,4],summary(Nfit2)$p.table[3,4],na.rm=TRUE)
+    #dependent Poisson
+    Pfit1<-mgcv::gam(X1.P~X2.C+X3.P,family="poisson",control=mgcv::gam.control(maxit=1000))
+    Pfit2<-mgcv::gam(X3.P~X2.C+X1.P,family="poisson",control=mgcv::gam.control(maxit=1000))
+    Pslopes.max[j,i]<-max(summary(Pfit1)$p.table[3,4],summary(Pfit2)$p.table[3,4],na.rm=TRUE)
+    Pslopes.min[j,i]<-min(summary(Pfit1)$p.table[3,4],summary(Pfit2)$p.table[3,4],na.rm=TRUE)
+    #dependent Binomial
+    Bfit1<-mgcv::gam(X1.B~X2.N+X3.B,family="binomial",control=mgcv::gam.control(maxit=1000))
+    Bfit2<-mgcv::gam(X3.B~X2.N+X1.B,family="binomial",control=mgcv::gam.control(maxit=1000))
+    Bslopes.max[j,i]<-max(summary(Bfit1)$p.table[3,4],summary(Bfit2)$p.table[3,4],na.rm=TRUE)
+    Bslopes.min[j,i]<-min(summary(Bfit1)$p.table[3,4],summary(Bfit2)$p.table[3,4],na.rm=TRUE)
+#Testing glm (no smoothing)
+    #dependent normal
+    r1<-residuals(mgcv::gam(X1.N~X2.N,family="gaussian",control=mgcv::gam.control(maxit=1000)),type="response")
+    r2<-residuals(mgcv::gam(X3.N~X2.N,family="gaussian",control=mgcv::gam.control(maxit=1000)),type="response")
+    Nglm[j,i]<-generalized.covariance(r1,r2)$prob
+    #dependent Poisson
+    r1<-residuals(mgcv::gam(X1.P~X2.C,family="poisson",control=mgcv::gam.control(maxit=1000)),type="response")
+    r2<-residuals(mgcv::gam(X3.P~X2.C,family="poisson",control=mgcv::gam.control(maxit=1000)),type="response")
+    Pglm[j,i]<-generalized.covariance(r1,r2)$prob
+    #dependent Binomial
+    r1<-residuals(mgcv::gam(X1.B~X2.N,family="binomial",control=mgcv::gam.control(maxit=1000)),type="response")
+    r2<-residuals(mgcv::gam(X3.B~X2.N,family="binomial",control=mgcv::gam.control(maxit=1000)),type="response")
+    Bglm[j,i]<-generalized.covariance(r1,r2)$prob
 #testing with smoothing and default smoother edf
-    r1<-residuals(mgcv::gam(X1~s(X2),family="poisson"),type="response")
-    r2<-residuals(mgcv::gam(X3~s(X2),family="poisson"),type="response")
-    p1[j,i]<-generalized.covariance(r1,r2)$prob
+    #dependent normal
+    r1<-residuals(mgcv::gam(X1.N~s(X2.N),family="gaussian",control=mgcv::gam.control(maxit=1000)),type="response")
+
+        r2<-residuals(mgcv::gam(X3.N~s(X2.N),family="gaussian",control=mgcv::gam.control(maxit=1000)),type="response")
+
+        Ngam[j,i]<-generalized.covariance(r1,r2)$prob
+    #dependent Poisson
+
+    r1<-residuals(mgcv::gam(X1.P~s(X2.C),family="poisson",control=mgcv::gam.control(maxit=1000)),type="response")
+
+    r2<-residuals(mgcv::gam(X3.P~s(X2.C),family="poisson",control=mgcv::gam.control(maxit=1000)),type="response")
+    Pgam[j,i]<-generalized.covariance(r1,r2)$prob
+    #dependent Binomial
+
+    r1<-residuals(mgcv::gam(X1.B~s(X2.N),family="binomial",control=mgcv::gam.control(maxit=1000)),type="response")
+
+    r2<-residuals(mgcv::gam(X3.B~s(X2.N),family="binomial",control=mgcv::gam.control(maxit=1000)),type="response")
+    Bgam[j,i]<-generalized.covariance(r1,r2)$prob
+    #testing with smoothing and increasing smoother edf
+    #dependent normal
+
+    r1<-residuals(mgcv::gam(X1.N~s(X2.N,k=k.max),family="gaussian",control=mgcv::gam.control(maxit=1000)),type="response")
+
+    r2<-residuals(mgcv::gam(X3.N~s(X2.N,k=k.max),family="gaussian",control=mgcv::gam.control(maxit=1000)),type="response")
+    NgamS[j,i]<-generalized.covariance(r1,r2)$prob
+    #dependent Poisson
+
+    r1<-residuals(mgcv::gam(X1.P~s(X2.C,k=k.max),family="poisson",control=mgcv::gam.control(maxit=1000)),type="response")
+
+    r2<-residuals(mgcv::gam(X3.P~s(X2.C,k=k.max),family="poisson",control=mgcv::gam.control(maxit=1000)),type="response")
+    PgamS[j,i]<-generalized.covariance(r1,r2)$prob
+    #dependent Binomial
+
+    r1<-residuals(mgcv::gam(X1.B~s(X2.N,k=k.max),family="binomial",control=mgcv::gam.control(maxit=1000)),type="response")
+
+    r2<-residuals(mgcv::gam(X3.B~s(X2.N,k=k.max),family="binomial",control=mgcv::gam.control(maxit=1000)),type="response")
+    BgamS[j,i]<-generalized.covariance(r1,r2)$prob
+  }
+
+}
+out<-list(Nslopes.max=Nslopes.max,Nslopes.min=Nslopes.min,Pslopes.max=
+  Pslopes.max,Pslopes.min=Pslopes.min,Bslopes.max=Bslopes.max,
+  Bslopes.min=Bslopes.min,Nglm=Nglm,Pglm=Pglm,Bglm=Bglm,Ngam=Ngam,
+  Pgam=Pgam,Bgam=Bgam,NgamS=NgamS,
+  PgamS=PgamS,BgamS=BgamS)
+
+#summarizing via quantiles
+
+for(n.methods in 1:15){
+  #cycle over different methods
+  print(names(out)[n.methods])
+  for(n.samples in 1:length(N)){
+  #cycle over different sample sizes
+    print(data.frame(N=N[n.samples],quantiles=round(quantile(out[[n.methods]][,n.samples],probs=c(0.025,0.05,0.1,0.5,0.975)),4)))
   }
 }
-#using generalized.covariance with k varying
-for(i in 1:length(N)){
-  print(round(quantile(p[,i],probs=c(0.025,0.05,0.1,0.5,0.975)),4))
+CI.Monte.Carlo<-function(N,p){
+  x<-(p*(1-p))/N
+  CI.upper<-p+1.96*sqrt(x)
+  CI.lower<-p-1.96*sqrt(x)
+  data.frame(CI.lower,CI.upper)
 }
-#using generalized.covariance with default k
-for(i in 1:length(N)){
-  print(round(quantile(p1[,i],probs=c(0.025,0.05,0.1,0.5,0.975)),4))
-}
-#using generalized.covariance with no smoothing
-for(i in 1:length(N)){
-  print(round(quantile(p4[,i],probs=c(0.025,0.05,0.1,0.5,0.975)),4))
-}
-#using maximum prob from two regressions
-for(i in 1:length(N)){
-  print(round(quantile(p2[,i],probs=c(0.025,0.05,0.1,0.5,0.975),na.rm=TRUE),4))
-}
-#using minimum prob from two regressions
-for(i in 1:length(N)){
-  print(round(quantile(p3[,i],probs=c(0.025,0.05,0.1,0.5,0.975),na.rm=TRUE),4))
-}
-plot(p[,4]~p2[,4])
-
-
-
