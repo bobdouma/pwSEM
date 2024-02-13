@@ -20,7 +20,7 @@ prob: asymptotic null probability of the T statistic.
 \description{
 This function calculates the generalized covariance statistic of
 Shah, R.D. & Peters, J. (2020); i.e. Y1 \emph{|} Y2 |{C}, where C is a set of
-common conditioning variables. Typically, R1 and R2 are the residuals
+common conditioning variables. R1 and R2 are the response residuals
 from pairs of regressions of two dependent variables (Y1 and Y2) on
 a set of conditioning variables.
 
@@ -30,8 +30,10 @@ testing and the generalized covariance measure.  The Annals of Statistics
 }
 \examples{
 #generalized.covariance function: X1_|_X3|{X2}
-R1<-residuals(mgcv::gam(X3~X2,data=sim_normal.no.nesting,family=gaussian))
-R2<-residuals(mgcv::gam(X1~X2,data=sim_normal.no.nesting,family=gaussian))
+R1<-residuals(mgcv::gam(X3~X2,data=sim_normal.no.nesting,family=gaussian),
+type="response")
+R2<-residuals(mgcv::gam(X1~X2,data=sim_normal.no.nesting,family=gaussian),
+type="response")
 generalized.covariance(R1,R2)
 
 }

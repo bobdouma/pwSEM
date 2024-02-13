@@ -368,6 +368,7 @@ get.unbiased.sems<-function(sem.functions,mag,equivalent.mag,
     residual.values)
 }
 
+#' @export
 update.fun<-function(sem.functions,i,all.grouping.vars,add.terms,data){
   #This function updates a gamm4 or gam model by adding the terms in "add.terms"
   #to the model formula and returning the fitted model
@@ -785,6 +786,7 @@ function(latents,conditioning.latents){
   return(1)
 }
 
+#' @export
 pairs.without.edge.in.pwSEM<-
 function(my.graph) {
   nvars<-dim(my.graph)[2]
@@ -1143,26 +1145,25 @@ get.residuals<-function(my.list,dsep,data,do.smooth,
   #if n.levels==0 then use gam, since no nesting structure
   #if n.levels>0 then use gamm for X
   if(n.levels1==0){
-# The default type of residuals for gam is "deviance"
-# For normal variables, this is the same as "response" residuals
-    r1<-stats::residuals(mgcv::gam(formula=fo$formula1,family=info$family[[v1]],data=data))
+# Response residuals must be used
+    r1<-stats::residuals(mgcv::gam(formula=fo$formula1,family=info$family[[v1]],data=data),
+                         type="response")
   }
   if(n.levels2==0){
-    r2<-stats::residuals(mgcv::gam(formula=fo$formula2,family=info$family[[v2]],data=data))
+    r2<-stats::residuals(mgcv::gam(formula=fo$formula2,family=info$family[[v2]],data=data),
+                         type="response")
   }
-# The default type of residuals form gamm4 are conditional deviance
-# residuals.  The conditional deviance is a measure of the lack of fit of the model to the
-# data, accounting for both fixed and random effects (ChatGPT 3.5)
+# The response residuals must be used
   if(n.levels1>0){
     fit<-gamm4::gamm4(formula=fo$formula1,random=info$random[[v1]],
                family=info$family[[v1]],data=data)
-    r1<-stats::residuals(fit$mer,type="deviance")
+    r1<-stats::residuals(fit$mer,type="response")
   }
   if(n.levels2>0){
     fit<-gamm4::gamm4(formula=fo$formula2,random=info$random[[v2]],
                family=info$family[[v2]],
                data=data)
-    r2<-stats::residuals(fit$mer,type="deviance")
+    r2<-stats::residuals(fit$mer,type="response")
   }
   data.frame(residuals1=r1,residuals2=r2)
 }
@@ -1170,7 +1171,7 @@ get.residuals<-function(my.list,dsep,data,do.smooth,
 #' Generalized covariance function
 #' @description This function calculates the generalized covariance statistic of
 #' Shah, R.D. & Peters, J. (2020); i.e. Y1 _|_ Y2 |{C}, where C is a set of
-#' common conditioning variables. Typically, R1 and R2 are the residuals
+#' common conditioning variables. R1 and R2 are the response residuals
 #' from pairs of regressions of two dependent variables (Y1 and Y2) on
 #'  a set of conditioning variables.
 #'
@@ -1191,8 +1192,10 @@ get.residuals<-function(my.list,dsep,data,do.smooth,
 #'
 #' @examples
 #' #generalized.covariance function: X1_|_X3|{X2}
-#' R1<-residuals(mgcv::gam(X3~X2,data=sim_normal.no.nesting,family=gaussian))
-#' R2<-residuals(mgcv::gam(X1~X2,data=sim_normal.no.nesting,family=gaussian))
+#' R1<-residuals(mgcv::gam(X3~X2,data=sim_normal.no.nesting,family=gaussian),
+#' type="response")
+#' R2<-residuals(mgcv::gam(X1~X2,data=sim_normal.no.nesting,family=gaussian),
+#' type="response")
 #' generalized.covariance(R1,R2)
 #'
 generalized.covariance<-function(R1,R2){
@@ -1200,7 +1203,7 @@ generalized.covariance<-function(R1,R2){
   #The hardness of conditional independence testing and the generalized
   #covariance measure. The Annals of Statistics 48:1514-1538.
   #
-  #R1 & R2 are the residuals of two regressions and n is the sample size
+  #R1 & R2 are the response residuals of two regressions and n is the sample size
   if(length(R1)!=length(R2))stop("In generalized.covariance, lengths of residual vectors not equal")
   n<-length(R1)
   num<-sqrt(n)*(1/n)*sum(R1*R2)
@@ -1218,7 +1221,7 @@ generalized.covariance<-function(R1,R2){
 #' of two random variables (Y1, Y2)
 #' conditional of a common set of conditioning variables {C}; see
 #' Shah, R.D. & Peters, J. (2020).
-#'  i.e. Y1 _|_ Y2 |{C}. Typically, R1 and R2 are the residuals
+#'  i.e. Y1 _|_ Y2 |{C}. R1 and R2 are the response residuals
 #' from pairs of any type of appropriate regressions of two dependent variables
 #'  (Y1 and Y2) on a set of conditioning variables.
 #'
@@ -1226,7 +1229,7 @@ generalized.covariance<-function(R1,R2){
 #' testing and the generalized covariance measure.  The Annals of Statistics
 #' 48:1514-1538.
 #' @param R1 a numerical vector (typically residuals of the first regression)
-#' @param R2 a numerical vector (typically residuals of the first regression)
+#' @param R2 a numerical vector (typically residuals of the second regression)
 #' @param nperm the number of permutations (defaults to 5000)
 #'
 #' @return
@@ -1240,15 +1243,17 @@ generalized.covariance<-function(R1,R2){
 #' @export
 #'
 #' @examples
-#' R1<-residuals(mgcv::gam(X3~X2,data=sim_normal.no.nesting,family=gaussian))
-#' R2<-residuals(mgcv::gam(X1~X2,data=sim_normal.no.nesting,family=gaussian))
+#' R1<-residuals(mgcv::gam(X3~X2,data=sim_normal.no.nesting,family=gaussian),
+#' type="response")
+#' R2<-residuals(mgcv::gam(X1~X2,data=sim_normal.no.nesting,family=gaussian),
+#' type="response")
 #'
 #' #perm.generalized.covariance function
 #' perm.generalized.covariance(R1,R2,nperm=5000)
 #'
 
 perm.generalized.covariance<-function(R1,R2,nperm=5000){
-  #R1, R2 are vectors holding the residuals; i.e. E[function]-observed
+  #R1, R2 are vectors holding the response residuals; i.e. E[function]-observed
   #The R1 vector is permuted each time.
   T.stat<-generalized.covariance(R1,R2)$T.stat
   perm.T<-rep(NA,nperm)

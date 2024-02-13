@@ -9,7 +9,7 @@ perm.generalized.covariance(R1, R2, nperm = 5000)
 \arguments{
 \item{R1}{a numerical vector (typically residuals of the first regression)}
 
-\item{R2}{a numerical vector (typically residuals of the first regression)}
+\item{R2}{a numerical vector (typically residuals of the second regression)}
 
 \item{nperm}{the number of permutations (defaults to 5000)}
 }
@@ -28,7 +28,7 @@ This performs a permutation version of the generalized covariance test
 of two random variables (Y1, Y2)
 conditional of a common set of conditioning variables {C}; see
 Shah, R.D. & Peters, J. (2020).
-i.e. Y1 \emph{|} Y2 |{C}. Typically, R1 and R2 are the residuals
+i.e. Y1 \emph{|} Y2 |{C}. R1 and R2 are the response residuals
 from pairs of any type of appropriate regressions of two dependent variables
 (Y1 and Y2) on a set of conditioning variables.
 
@@ -37,8 +37,10 @@ testing and the generalized covariance measure.  The Annals of Statistics
 48:1514-1538.
 }
 \examples{
-R1<-residuals(mgcv::gam(X3~X2,data=sim_normal.no.nesting,family=gaussian))
-R2<-residuals(mgcv::gam(X1~X2,data=sim_normal.no.nesting,family=gaussian))
+R1<-residuals(mgcv::gam(X3~X2,data=sim_normal.no.nesting,family=gaussian),
+type="response")
+R2<-residuals(mgcv::gam(X1~X2,data=sim_normal.no.nesting,family=gaussian),
+type="response")
 
 #perm.generalized.covariance function
 perm.generalized.covariance(R1,R2,nperm=5000)

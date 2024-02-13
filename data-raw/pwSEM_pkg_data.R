@@ -182,44 +182,7 @@ for(i in 1:6){
     print(round(quantile(p[,i],probs=c(0.025,0.05,0.1,0.5)),4))
 }
 
-# Case 2 of Appendix 1 of MEE paper
-#X1<--X2-->X3
-set.seed(99)
-
-X2.C<-rchisq(200,2)
-X1<-rpois(200,0.5*X2)
-X3<-rpois(200,0.5*X2)
-
-#Without smooths...
-fit1<-mgcv::gam(X1~X2+X3,family="poisson",
-                gam.control(epsilon=1e-8,maxit=1000))
-summary(fit1)
-fit2<-mgcv::gam(X3~X2,family="poisson")
-generalized.covariance(residuals(fit1,type="response"),residuals(fit2,type="response"))
-#p=0.057
-#with smooths using defaults...
-fit1<-mgcv::gam(X1~s(X2),family="poisson")
-fit2<-mgcv::gam(X3~s(X2),family="poisson")
-plot(residuals(fit1,type="response")~residuals(fit2,type="response"))
-generalized.covariance(residuals(fit1,type="response"),residuals(fit2,type="response"))
-#p=0.42
-#with smooths using more knots...
-#k=3, p=0.55
-#k=5, p=0.10
-#k=10 (default), p=0.42
-#k=15, p=0.48
-#k=20, p=0.47
-#k=30, p=0.53
-#k=50, p=0.53
-#k=70, p=0.52
-fit1<-mgcv::gam(X1~s(X2,k=10),family="poisson")
-fit2<-mgcv::gam(X3~s(X2,k=10),family="poisson")
-plot(residuals(fit1,type="response")~residuals(fit2,type="response"))
-generalized.covariance(residuals(fit1,type="response"),residuals(fit2,type="response"))
-#p=0.42
-#Using their regression as gam...
-gcm.test(X=X1,Y=X3,Z=X2,regr.method="gam",plot.residuals = TRUE)
-#p=0.49
+# Monte Carlo simulations for Appendix 1 of MEE paper
 
 set.seed(100)
 N<-c(10,50,100,200)
@@ -236,7 +199,8 @@ for(j in 1:nsim){
     k.max<-min(k.max,20)
 #Poisson variates require a strictly positive value of X2 (X2.C)
 #Normal or Binomial variates can use +/- values of X2 (X2.N)
-    X2.C<-rchisq(N[i],2)
+    X2.C<-rnorm(N[i],2)
+    X2.C<-X2.C+abs(min(X2.C))+1
     X2.N<-rnorm(N[i])
 #Now generate values for X1...
     X1.N<-rnorm(N[i],0.5*X2.N)
@@ -332,12 +296,73 @@ for(n.methods in 1:15){
   print(names(out)[n.methods])
   for(n.samples in 1:length(N)){
   #cycle over different sample sizes
-    print(data.frame(N=N[n.samples],quantiles=round(quantile(out[[n.methods]][,n.samples],probs=c(0.025,0.05,0.1,0.5,0.975)),4)))
+    print(data.frame(N=N[n.samples],quantiles=
+    round(quantile(out[[n.methods]][,n.samples],probs=c(0.025,0.05,0.1,0.5,0.975)),4)))
   }
 }
+
 CI.Monte.Carlo<-function(N,p){
   x<-(p*(1-p))/N
   CI.upper<-p+1.96*sqrt(x)
   CI.lower<-p-1.96*sqrt(x)
   data.frame(CI.lower,CI.upper)
+}
+
+#Simulation of perm.generalised.covariance for Appendix 1 of MEE
+set.seed(100)
+N<-c(10,50)
+nsim<-1000
+Nglm<-Pglm<-Bglm<-Nglmp<-Pglmp<-Bglmp<-matrix(NA,nrow=nsim,ncol=length(N))
+for(j in 1:nsim){
+  print(paste("nsim=",j))
+  for(i in 1:length(N)){
+    #testing increasing k with N
+
+    #Poisson variates require a strictly positive value of X2 (X2.C)
+    #Normal or Binomial variates can use +/- values of X2 (X2.N)
+    X2.C<-rnorm(N[i],2)
+    X2.C<-X2.C+abs(min(X2.C))+1
+    X2.N<-rnorm(N[i])
+    #Now generate values for X1...
+    X1.N<-rnorm(N[i],0.5*X2.N)
+    X1.P<-rpois(N[i],0.5*X2.C)
+    #Logistic function linking p to  X2 for binomial distribution
+    logistic<-exp(0.5*X2.N)/(1+exp(0.5*X2.N))
+    X1.B<-rbinom(N[i],size=1,prob=logistic)
+    #Now generate values for X3...
+    X3.N<-rnorm(N[i],0.5*X2.N)
+    X3.P<-rpois(N[i],0.5*X2.C)
+    X3.B<-rbinom(N[i],size=1,prob=logistic)
+    #Testing glm (no smoothing)
+    #dependent normal
+    r1<-residuals(mgcv::gam(X1.N~X2.N,family="gaussian",control=mgcv::gam.control(maxit=1000)),type="response")
+    r2<-residuals(mgcv::gam(X3.N~X2.N,family="gaussian",control=mgcv::gam.control(maxit=1000)),type="response")
+    Nglm[j,i]<-generalized.covariance(R1=r1,R2=r2)$prob
+    Nglmp[j,i]<-perm.generalized.covariance(R1=r1,R2=r2)$permutation.prob
+    #dependent Poisson
+    r1<-residuals(mgcv::gam(X1.P~X2.C,family="poisson",control=mgcv::gam.control(maxit=1000)),type="response")
+    r2<-residuals(mgcv::gam(X3.P~X2.C,family="poisson",control=mgcv::gam.control(maxit=1000)),type="response")
+    Pglm[j,i]<-generalized.covariance(R1=r1,R2=r2)$prob
+    Pglmp[j,i]<-perm.generalized.covariance(R1=r1,R2=r2)$permutation.prob
+    #dependent Binomial
+    r1<-residuals(mgcv::gam(X1.B~X2.N,family="binomial",control=mgcv::gam.control(maxit=1000)),type="response")
+    r2<-residuals(mgcv::gam(X3.B~X2.N,family="binomial",control=mgcv::gam.control(maxit=1000)),type="response")
+    Bglm[j,i]<-generalized.covariance(R1=r1,R2=r2)$prob
+    Bglmp[j,i]<-perm.generalized.covariance(R1=r1,R2=r2)$permutation.prob
+  }
+}
+out<-list(Nglm=Nglm,Pglm=Pglm,Bglm=Bglm,Nglmp=Nglmp,Pglmp=Pglmp,
+          Bglmp=Bglmp)
+
+#summarizing via quantiles
+n.mods<-length(out)
+for(n.methods in 1:n.mods){
+  #cycle over different methods
+  print(names(out)[n.methods])
+  for(n.samples in 1:length(N)){
+    #cycle over different sample sizes
+    print(data.frame(N=N[n.samples],quantiles=
+      round(quantile(out[[n.methods]][,n.samples],
+      probs=c(0.025,0.05,0.1,0.5,0.975),na.rm=TRUE),4)))
+  }
 }
