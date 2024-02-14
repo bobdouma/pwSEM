@@ -144,11 +144,16 @@ out<-pwSEM(sem.functions=my.list,dependent.errors=list(X4~~X2),
 summary(out,structural.equations=TRUE)
 ```
 
-The use of the mgcv package, and the two model functions "gam" and "gamm4", allow a very wide range of models.  If you want linear models, then use "gam" or "gamm4" without any smoother terms.  For example gam(Y~X,...) fits a linear relationship between Y and X while gam(Y~s(X),...) will fit a smoother function that is not linear unless the underlying relationship is truly linear (and you have lots of data).  The smoother operator "s()" can also be used in gamm4.  If you specify distributions other than "gaussian" (i.e. normal) in the family= argument, then you will model non-normal data.  If you want to include a random component to the model (for example, to account for nested data), then use the gamm4 function.
-*Note that not all of the functionality of these two functions is accepted in this version of pwSEM*.  For instance, you can somewhat control the degree of nonlinearity ("wigglyness") of smoother splines via s(X, k=) or other types of smoother splines, but pwSEM cannot accommodate this.  If your SEMs are sufficiently complicated to require this, then it is best to do this individually rather than via pwSEM.
+**Using the mgcv package**
 
-An important reference to the mgcv package, and the underlying theory, is:
+Modelling the structural equations in the pwSEM package uses the mgcv package;  see Wood (2017) for complete details of the practice and theory of this package.
+
 Wood, S.N. (2017).  Generalized Additive Models: An introduction with R, 2nd edition.  CRC Press, Taylor & Francis Group. Boca Raton, FL, USA.
+
+The use of the mgcv package, and the two model functions "gam" and "gamm4", allow a very wide range of models.  If you want linear models, then use "gam" or "gamm4" without any smoother terms.  For example gam(Y~X,...) fits a linear relationship between Y and X while gam(Y~s(X),...) will fit a smoother function that is not linear unless the underlying relationship is truly linear (and you have lots of data).  The smoother operator "s()" can also be used in gamm4.  If you specify distributions other than "gaussian" (i.e. normal) in the family= argument, then you will model non-normal data.  If you want to include a random component to the model (for example, to account for nested data), then use the gamm4 function.
+*Note that not all of the functionality of these two functions is accepted in this version of pwSEM*.  For instance, you can somewhat control the degree of nonlinearity ("wigglyness") of smoother splines via s(X, k=) or other types of smoother splines, but pwSEM cannot accommodate this.  If your SEMs are sufficiently complicated to require this, then it is best to do this individually rather than via pwSEM.  Certainly, more complicated modelling of generalized linear and generalized additive models, with or without a random component (i.e. mixed models) requires that you have a good knowledge of this field!
+For instance, fitting models with a Poisson distribution (i.e. family=poisson) can run into problems when there are lots of zero values even though the model might converge without throwing out any error or warning messages.  You could try a zero-inflated version but this is not something for beginners...
+
 
 ## generalized covariance function and its permutation version
 
