@@ -366,3 +366,21 @@ for(n.methods in 1:n.mods){
       probs=c(0.025,0.05,0.1,0.5,0.975),na.rm=TRUE),4)))
   }
 }
+
+#piecewiseSEM analysis of sim_data.no.nesting
+
+X1<-rnorm(10000)
+L24<-rnorm(10000)
+X2<-0.5*X1+0.5*L24+rnorm(10000,sqrt(1-2*0.5^2))
+X3<-0.5*X2+rnorm(10000,sqrt(1-0.5^2))
+X4<-0.5*X3+0.5*L24+rnorm(10000,sqrt(1-2*0.5^2))
+dat<-data.frame(X1,X2,X3,X4)
+library(piecewiseSEM)
+out<-psem(
+  lm(X2~X1,data=dat),
+  lm(X3~X2,data=dat),
+  lm(X4~X3,data=dat),
+  data=dat)
+summary(update(out,X2%~~%X4),
+  conditioning=TRUE,conserve=TRUE)
+summary(lm(X4~X3+X1, data=dat))
