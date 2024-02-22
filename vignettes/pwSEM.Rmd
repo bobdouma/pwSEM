@@ -38,8 +38,13 @@ The pwSEM package contains functions for conducting piecewise structural equatio
 There are three main steps required to fit and output the results of a piecewise SEM:
 
 1. Create a list containing all of the structural equations, following your causal hypothesis (DAG or MAG).  Note that any dependent errors are not included in this first step.  **Note also that you must also include the structural equations for all of the exogenous variables.  People often forget this and, if you do, it will result in an error message**.  These structural equations are constructed using either the gam() or the gamm4() functions of the mgcv package; see Wood, S.N. (2017).  Generalized Additive Models: An introduction with R (2nd edition).  CRC Press (Chapman & Hall).
+
 2. Create output from the pwSEM() function by inputting (1) your list (from step 1), (2) a list of dependent errors (if any), (3) the data set that will be used to fit the data (this must be the same as given inside the gam or gamm4 calls from step 1),  (4) whether you want to use asymptotic probabilities of the d-separation claims or permutation probabilities (for small sample sizes of approximately <100), and (5) how many permutations you require (defaults to 5000).  Note that permutation probabilities will slow down the pwSEM() function.
+
 3. The output from step 2 contains many objects resulting from the fit, but it is more convenient to use the summary() function to output the results.  Use the argument "structural.equations=TRUE" if you also want the fits of the structural equations to be output.
+
+There is also one optional step if you want to visually view the effects of variables along different paths.  If all of your variables are normally distributed (i.e. family=gaussian) and the relationships between the variables are all linear, then you can easily obtain the effects of variables along different paths using the basic rules of combining path coefficients: multiply the path coefficients (i.e. slopes of the regressions) along a directed path.  For instance, if you have X-(a)->Y-(b)->Z, where a and b are the slopes of the two regressions (Y~X and Z~Y) then the effect of X on Z along this path is a*b.  However, if you have allowed the relationships between the variables to be potentially nonlinear via a smoother term in gam or gamm4 (for example, Y~s(X)) then the relationship between the variables is nonlinear and the effect (i.e. the 1st derivative of the function) is not constant.  You can't talk about a path "coefficient" because the slope (the 1st derivative) changes with the values of the independent variable.  Note also that if any of the endogenous variables along the path are non-normal (for example, using family=poisson) then the effect (the slope) is constant when the dependent variable is transformed by its link function (a ln(Y) transform if family=poisson), the effect is not constant if you consider the dependent variable in its original scale.
+Therefore, to view the relationship between two variables along any path in the DAG, you can use the view.paths() function in this package, which will produce a graph showing the relationship between the two variables and a graph showing the (approximate) effect for different values of the independent variable.
 
 Here is the pwSEM function:
 
@@ -127,6 +132,13 @@ summary(out,structural.equations=TRUE)
 ```
 Since each dependent variable in the model is now Poisson distributed, the slopes of the structural equations are for the ln-transformed values since this is the link function for Poisson distributed variables in a generalized linear model.  If you want to express the structural equations in the original scale of these variables, you must back-transform.  For example, the second structural equation is (implicitly) ln(X2)=0.25+0.17X1 even though the ln-transform isn't explicit.  To get this structural equation in the original scale of X2 you would do: exp(0.25)*exp(0.17X1).
 Note that the Spearman correlation between the residuals of X4 and X2 (on their original scale) is reported rather than a covariance and a Pearson correlation since the variables are not normally distributed.
+
+To see the effect of X1 on X4  along all possible directed paths from X1 to X4 (there is only one such path in this example),you could use the view.paths() function:
+
+```{r}
+view.paths(from="X1",to="X4",sem.functions=out$sem.functions,data=
+sim_poisson.no.nesting,scale="response",dag=out$causal.graph)
+```
 
 ### Example 3: dependent errors involving endogenous variables, normally-distributed data and with a 2-level grouping structure and using smoothing splines for the d-separation tests
 

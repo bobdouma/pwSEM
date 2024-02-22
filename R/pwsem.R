@@ -1406,3 +1406,202 @@ extract.variable.info.from.gam<-function(fo){
   names(grouping.structure)<-"no.groups"
   list(var.name=var.name,family=family,grouping.structure=grouping.structure)
 }
+
+#' Title  view.path
+#'
+#'This is a function, usually called after pwSEM, to allow you to visually
+#'see how two variables in the DAG relate to each other along all directed paths
+#'from one to the other and to see how the 1st derivative of this relationship
+#'changes as the "from" variable changes.  For linear relationships, this is a
+#'constant (the path coefficient).
+#' @param from The name (character) of the variable at the beginning of the path
+#' @param to The name (character) of the variable at the end of the path
+#' @param sem.functions A list containing the gam or gamm4 functions that
+#' define the structural equations.  This is normally the sem.functions returned
+#' from pwSEM
+#' @param data The data frame containing the empirical data used in the SEM functions
+#' @param minimum.x The minimum value of the "from" variable; defaults to NULL, in
+#' which case the minimum and maximum values of the "from" variable in the
+#' data set are used.
+#' @param maximum.x The maximum value of the "to" variable; defaults to NULL, in
+#' which case the minimum and maximum values of the "from" variable in the
+#' data set are used.
+#' @param scale The chosen scale in which to express the results; either "response"
+#' (which uses the original scale of the variable) or "link" (which uses the
+#' scale of the link function for the "to" variable)
+#' @param return.values A logical value (TRUE returns the values of "from" and an
+#' estimate of the 1st derivative of the function for from-->to)
+#' @param dag The directed acyclic graph (DAG) used; usually this is the causal.graph
+#' object returned from a call to pwSEM
+#' @return Graphs are produced for each directed path from-->to and (return.values=TRUE)
+#' a data frame containing the values of the "from" variable and approxiate values of
+#' the 1st derivative of the function linking from-->to (i.e.the path coefficient)
+#' if the relationship is linear.
+#' @importFrom graphics par
+#' @importFrom stats predict
+#' @export
+#' @examples
+#' # Example with correlated endogenous errors, Poisson distributed variables
+#' #and no nesting structure in the data
+#' # "sim_poisson.no.nesting" is included with package
+#' # DAG: X1->X2->X3->X4 and X2<->X4
+#' # CREATE A LIST HOLDING THE STRUCTURAL EQUATIONS USING gam()
+#' library(mgcv)
+#' my.list<-list(mgcv::gam(X1~1,data=sim_poisson.no.nesting,family=gaussian),
+#'          mgcv::gam(X2~X1,data=sim_poisson.no.nesting,family=poisson),
+#'          mgcv::gam(X3~X2,data=sim_poisson.no.nesting,family=poisson),
+#'          mgcv::gam(X4~X3,data=sim_poisson.no.nesting,family=poisson))
+#' # RUN THE pwSEM FUNCTION WITH PERMUTATION PROBABILITIES WITH 10000
+#' # PERMUTATIONS AND INCLUDING THE DEPENDENT ERRORS
+#' out<-pwSEM(sem.functions=my.list,dependent.errors=list(X4~~X2),
+#'           data=sim_poisson.no.nesting,use.permutations = TRUE,n.perms=10000)
+#' view.paths(from="X1",to="X4",sem.functions=out$sem.functions,data=
+#' sim_poisson.no.nesting,scale="response",dag=out$causal.graph)
+#'
+view.paths<-function(from,to,sem.functions,data,minimum.x=NULL,
+                         maximum.x=NULL,scale="response",return.values=FALSE,
+                     dag){
+  estimate.deriv<-function(x,y){
+    # to avoid duplicate x values in delta.x
+    unique.x.rows<-!duplicated(matrix(x,ncol=1))
+    x<-x[unique.x.rows]
+    y<-y[unique.x.rows]
+    ord<-order(x)
+    x<-x[ord]
+    y<-y[ord]
+    n<-length(x)
+    out<-data.frame(x=round(x[1:(n-1)],4),y=rep(NA,n-1))
+    delta.y<-y[1:(n-1)]-y[2:n]
+    if(any(is.na(delta.y)))stop("na in delta.y")
+    delta.x<-x[1:(n-1)]-x[2:n]
+    if(any(is.na(delta.x)))stop("na in delta.x")
+    if(any(delta.x==0))stop("delta.x=0")
+    out$y<-delta.y/delta.x
+    if(any(is.na(out$y)))stop("na in out$y")
+    out
+  }
+  if(scale!="response" & scale!="link")stop("ERROR.  scale must be either
+            response or link")
+  #Remove dependent errors
+  for(i in 1: dim(dag)[2]){
+    for(j in 1:dim(dag)[2]){
+      if(dag[i,j]==100)dag[i,j]<-0
+    }
+  }
+  ggm::drawGraph(dag)
+  cat("Press Enter to continue...")
+  readline(prompt="")
+  vars.in.dag<-colnames(dag)
+  if(sum(from==vars.in.dag)==0){
+    error.text<-paste("ERROR. ",from, "not in DAG")
+    stop(error.text)
+  }
+  if(sum(to==vars.in.dag)==0){
+    error.text<-paste("ERROR. ",to, "not in DAG")
+    stop(error.text)
+
+  }
+  G <- igraph::graph_from_adjacency_matrix(dag) # an igraph graph object
+  dpaths<-igraph::all_simple_paths(G, from = from, to = to,mode="out")
+  if(length(dpaths)<1)stop("No directed paths to evaluate")
+  #Cycle over each path from-->to
+  cols.in.dag<-which(names(data)%in% vars.in.dag)
+  # Cycle over each directed path in from-->to
+  for(path.i in 1:length(dpaths)){
+    new.dat<-data
+    new.dat.col<-1:dim(new.dat)[2]
+    new.dat[,cols.in.dag]<-0
+    #get the name of the first (independent variable)
+    ind.var<-as.character(row.names(dag)[dpaths[[path.i]][1]])
+    c1<-new.dat.col[colnames(new.dat)==ind.var]
+    #use the actual X values
+    if(is.null(minimum.x)){
+      ord<-order(data[,c1])
+      new.dat[,c1]<-data[ord,c1]
+      #      new.dat[,c1]<-data[,c1]
+    }
+    if(!is.null(minimum.x)){
+      if(is.null(maximum.x) | (maximum.x<=minimum.x))
+        stop("Error in value for maximum.x")
+      #generate sequence of values for X
+      new.dat[,c1]<-seq(minimum.x,maximum.x,
+                        length.out=length(data[,c1]))
+    }
+    from.var.values<-new.dat[,c1]
+    #This loops through the remaining vertices in this path
+    for(j in 2:length(dpaths[[path.i]])){
+      dep.in.path<-as.character(row.names(dag)[dpaths[[path.i]][j]])
+      # ind.var and dep.in.path are the two variables along this path that
+      # we keep for the predictions from the regression
+
+      #We keep only the values of the ind.var in new.data for predictions
+
+      for(this.regression in 1:length(sem.functions)){
+        if(!inherits(sem.functions[i][[1]]$mer,"lmerMod") &
+           !inherits(sem.functions[i][[1]]$mer,"glmerMod")){
+          dep.var.reg<-as.character(stats::formula(sem.functions[[this.regression]]))[2]
+          if(dep.var.reg==dep.in.path){
+
+            #We must set to zero all variables except the variable along the path!
+            choose.reg<-sem.functions[[this.regression]]
+            c2<-new.dat.col[colnames(new.dat)==dep.var.reg]
+            # get the predicted values and put them in new.dat
+            fit<-stats::predict(choose.reg,newdata=new.dat,type=scale)
+            new.dat[,c2]<-fit
+            new.dat2<-new.dat
+            # Now, set all other DAG variables to zero
+            sel<-cols.in.dag[!cols.in.dag %in% c2]
+            new.dat[,sel]<-0
+          }
+        }
+        if(inherits(sem.functions[i][[1]]$mer,"lmerMod") |
+           inherits(sem.functions[i][[1]]$mer,"glmerMod")){
+          dep.var.reg<-as.character(stats::formula(sem.functions[[this.regression]]$gam))[2]
+          if(dep.var.reg==dep.in.path){
+            # $gam or $mer? "the fitted model object returned by lmer or glmer.
+            # Extra random and fixed effect terms will appear relating to the
+            # estimation of the smooth terms."
+
+            #We must set to zero all variables except the variable along the path!
+            choose.reg<-sem.functions[[this.regression]]$gam
+            c2<-new.dat.col[colnames(new.dat)==dep.var.reg]
+            # get the predicted values and put them in new.dat
+            fit<-predict(choose.reg,newdata=new.dat,type=scale)
+            new.dat[,c2]<-fit
+            new.dat2<-new.dat
+            # Now, set all other DAG variables to zero
+            sel<-cols.in.dag[!cols.in.dag %in% c2]
+            new.dat[,sel]<-0
+          }
+        }
+      }
+    }
+    get.der<-estimate.deriv(x=from.var.values,y=new.dat[,c2])
+    vars.in.path<-as.numeric(dpaths[[path.i]])
+    n.vars.in.path<-length(vars.in.path)
+    start.var<-as.character(row.names(dag)[vars.in.path[1]])
+    print.path<-paste(start.var[1],"->")
+    if(n.vars.in.path>2){
+      for(k in 2:(n.vars.in.path-1)){
+        next.var<-as.character(row.names(dag)[vars.in.path[k]])
+        print.path<-paste(print.path,next.var,"->")
+      }
+    }
+    next.var<-as.character(row.names(dag)[vars.in.path[n.vars.in.path]])
+    print.path<-paste(print.path,next.var)
+    print(paste("Path ",path.i,":",print.path))
+    graphics::par(mfrow=c(1,2))
+    plot(new.dat[,colnames(new.dat)==next.var]~from.var.values,type="l",
+         xlab=paste(start.var[1],"(scale =",scale,")"),ylab=
+           paste("Predicted value of ",next.var),main=print.path,lwd=2)
+    plot(x=get.der$x,y=round(get.der$y,4),type="l",
+         ylab=paste("path function (derivative) of ",from," on" ,to),
+         main=print.path,xlab=paste(from,"(scale = ",scale,")"),lwd=2)
+    par(mfrow=c(1,1))
+    if(path.i < length(dpaths)){
+      cat("Press Enter to continue...")
+      readline(prompt="")
+    }
+    if(return.values)get.der
+  }
+}

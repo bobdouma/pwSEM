@@ -14,6 +14,7 @@ RoxygenNote: 7.3.1
 Imports: 
     gamm4,
     ggm,
+    igraph,
     mgcv
 Suggests:
     knitr,
