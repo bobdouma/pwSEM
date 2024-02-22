@@ -1407,7 +1407,7 @@ extract.variable.info.from.gam<-function(fo){
   list(var.name=var.name,family=family,grouping.structure=grouping.structure)
 }
 
-#' Title  view.path
+#' Title  view.paths
 #'
 #'This is a function, usually called after pwSEM, to allow you to visually
 #'see how two variables in the DAG relate to each other along all directed paths
@@ -1439,7 +1439,6 @@ extract.variable.info.from.gam<-function(fo){
 #' if the relationship is linear.
 #' @importFrom graphics par
 #' @importFrom stats predict
-#' @export
 #' @examples
 #' # Example with correlated endogenous errors, Poisson distributed variables
 #' #and no nesting structure in the data
@@ -1457,6 +1456,7 @@ extract.variable.info.from.gam<-function(fo){
 #' view.paths(from="X1",to="X4",sem.functions=out$sem.functions,data=
 #' sim_poisson.no.nesting,scale="response",dag=out$causal.graph)
 #'
+#' @export
 view.paths<-function(from,to,sem.functions,data,minimum.x=NULL,
                          maximum.x=NULL,scale="response",return.values=FALSE,
                      dag){

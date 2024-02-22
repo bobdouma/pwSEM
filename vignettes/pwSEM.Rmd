@@ -135,10 +135,10 @@ Note that the Spearman correlation between the residuals of X4 and X2 (on their 
 
 To see the effect of X1 on X4  along all possible directed paths from X1 to X4 (there is only one such path in this example),you could use the view.paths() function:
 
-```{r}
-view.paths(from="X1",to="X4",sem.functions=out$sem.functions,data=
-sim_poisson.no.nesting,scale="response",dag=out$causal.graph)
-```
+
+`view.paths(from="X1",to="X4",sem.functions=out$sem.functions,data=sim_poisson.no.nesting,scale="response",dag=out$causal.graph)`
+
+Type `help("view.graphs")` for more information on using this function.
 
 ### Example 3: dependent errors involving endogenous variables, normally-distributed data and with a 2-level grouping structure and using smoothing splines for the d-separation tests
 
