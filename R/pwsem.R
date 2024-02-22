@@ -1443,18 +1443,17 @@ extract.variable.info.from.gam<-function(fo){
 #' @examples
 #' # Example with correlated endogenous errors, Poisson distributed variables
 #' #and no nesting structure in the data
-#' # "sim_poisson.no.nesting" is included with package
 #' # DAG: X1->X2->X3->X4 and X2<->X4
-#' # CREATE A LIST HOLDING THE STRUCTURAL EQUATIONS USING gam()
-#' library(mgcv)
 #' my.list<-list(mgcv::gam(X1~1,data=sim_poisson.no.nesting,family=gaussian),
 #'          mgcv::gam(X2~X1,data=sim_poisson.no.nesting,family=poisson),
 #'          mgcv::gam(X3~X2,data=sim_poisson.no.nesting,family=poisson),
 #'          mgcv::gam(X4~X3,data=sim_poisson.no.nesting,family=poisson))
-#' # RUN THE pwSEM FUNCTION WITH PERMUTATION PROBABILITIES WITH 10000
-#' # PERMUTATIONS AND INCLUDING THE DEPENDENT ERRORS
 #' out<-pwSEM(sem.functions=my.list,dependent.errors=list(X4~~X2),
 #'           data=sim_poisson.no.nesting,use.permutations = TRUE,n.perms=10000)
+#' # To see each of the effects of X1 on X4 (only one in this example), we
+#' # use view.paths() while imputing the list of SEM functions (out$sem.functions)
+#' # and the DAG (out$causal.graph) that are output from the pwSEM function.
+#'
 #' view.paths(from="X1",to="X4",sem.functions=out$sem.functions,data=
 #' sim_poisson.no.nesting,scale="response",dag=out$causal.graph)
 #'
