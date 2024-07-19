@@ -747,28 +747,56 @@ add.dependent.errors<-function(DAG,dependent.errors){
 }
 
 MAG.to.DAG.in.pwSEM<-function(x){
-  index = which(x==100,arr.ind=T)
-  n <- nrow(index)/2 # pairs of dependent errors
-  new.DAG <- matrix(0,ncol=ncol(x)+n,nrow=nrow(x)+n) # new DAG including latent variables
+  #index.M returns a matrix giving the row and column numbers for
+  #the pairs that are implicitly marginalized (X<->Y)
+  #index.C returns a matrix giving the row and column numbers for
+  #the pairs that are implicitly conditioned (X--Y)
+
+  index.M = which(x==100,arr.ind=T)
+  n.M <- nrow(index.M)/2 # pairs with marginalized latents
+  index.C<-which(x==10,arr.ind=T)
+  n.C<-nrow(index.C/2)/2 # pairs with conditioned latents
+  # new DAG including latent variables
+  #set elements inrows and columns of latents to zero to start
+  new.DAG <- matrix(0,ncol=ncol(x)+n.M+n.C,nrow=nrow(x)+n.M+n.C)
+  #copy the original MAG into the observed vars in new.DAG
   new.DAG[1:ncol(x),1:nrow(x)]<-x
   # add names to matrix
-  colnames(new.DAG) <- c(colnames(x),paste("L",1:n,sep=""))
-  rownames(new.DAG) <- c(colnames(x),paste("L",1:n,sep=""))
-  new.DAG[(nrow(x)+1):(nrow(x)+n),] <- 0 # the latents do not have causal parents, so set to zero
+  #colnames(new.DAG) <- c(colnames(x),paste("L",1:n,sep=""))
+
+  colnames(new.DAG) <- c(colnames(x),paste("L",1:(n.M+n.C),sep=""))
+  rownames(new.DAG) <- c(colnames(x),paste("L",1:(n.M+n.C),sep=""))
+  # modify for marginal latents...
+  # the marginal latents do not have causal parents, so set to zero
+  new.DAG[(nrow(x)+1):(nrow(x)+n.M),] <- 0
   # find pairs of observed variables caused by the same latent
-  cat <- apply(index,1,paste,collapse="")
-  cat2 <- apply(index[,c(2,1)],1,paste,collapse="")
+  cat <- apply(index.M,1,paste,collapse="")
+  cat2 <- apply(index.M[,c(2,1)],1,paste,collapse="")
   match <- match(cat,cat2) # matrix row number that has the second pair of the dependent error
   # replace dependent error by directed path from Latent
   no = 1
-  for (i in 1:n){
-    new.DAG[ncol(x)+no,index[i,1]] <- 1
-    new.DAG[ncol(x)+no,index[match[i],1]] <- 1
+  for (i in 1:n.M){
+    new.DAG[ncol(x)+no,index.M[i,1]] <- 1
+    new.DAG[ncol(x)+no,index.M[match[i],1]] <- 1
     no = no+1
-    index <- index[-match[i],]
-    if (no > n){stop}
+    index.M <- index.M[-match[i],]
+    if (no > n.M){stop}
   }
-  new.DAG[new.DAG==100] = 0
+  # find pairs of observed variables that are caused by the same latent
+  cat <- apply(index.C,2,paste,collapse="")
+  cat2 <- apply(index.C[,c(2,1)],1,paste,collapse="")
+  match <- match(cat,cat2) # matrix row number that has the second pair of the dependent error
+  # replace dependent error by directed path from Latent
+  #  no = 1
+  for (i in 1:n.C){
+    new.DAG[index.C[i,1],ncol(x)+no] <- 1
+    new.DAG[index.C[match[i],1],ncol(x)+no] <- 1
+    no = no+1
+    index.C <- index.C[-match[i],]
+    if (no > n.C){stop}
+  }
+  new.DAG[new.DAG==100] <- 0
+  new.DAG[new.DAG==10]<-0
   return(new.DAG)
 
 }
