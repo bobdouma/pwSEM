@@ -580,7 +580,7 @@ summary.pwSEM.class<-function(object,structural.equations=FALSE,...){
     }
   }
   if(any(object$causal.graph!=object$dsep.equivalent.causal.graph)){
-    cat("d-separation equivalent DAG or MAG",fill=T)
+    cat("m-separation equivalent DAG or MAG",fill=T)
     for(i in 1:(n.vars-1)){
       for(j in (i+1):n.vars){
         if(object$dsep.equivalent.causal.graph[i,j]==1)
@@ -609,7 +609,7 @@ summary.pwSEM.class<-function(object,structural.equations=FALSE,...){
   }
   if(!object$use.permutations & object$n.data.lines<100)
     cat("Given small sample size, you should specify use.permutations=T",fill=T)
-  cat("Null probabilities of d-separation claims in basis set",fill=T)
+  cat("Null probabilities of independence claims in basis set",fill=T)
   for(i in 1:n){
     cat("(",n2[i],") ",object$dsep.probs[i],
         sep="",fill=T)
