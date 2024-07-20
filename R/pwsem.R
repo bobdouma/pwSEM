@@ -122,7 +122,7 @@ pwSEM.class<-function(x){
 #'# see vignette("pwSEM")
 #'
 #' @export
-pwSEM<-function(sem.functions,dependent.errors=NULL,data,
+pwSEM<-function(sem.functions,dependent.errors=NULL,selection.bias=NULL,data,
                 use.permutations=FALSE,n.perms=5000,do.smooth=FALSE,
                 all.grouping.vars=NULL){
   #
@@ -130,6 +130,8 @@ pwSEM<-function(sem.functions,dependent.errors=NULL,data,
   #variable in the sem, including exogenous variables.
   #dependent.errors is a list giving any free covariances, given
   #in the form of X~~y
+  #selection.bias is a list giving any selection bias, given
+  #in the form of x-y
   #all.grouping.vars is a character vector giving the names of all
   #variables involved in the sem functions that define groups for
   #random effects.
@@ -150,21 +152,41 @@ pwSEM<-function(sem.functions,dependent.errors=NULL,data,
   #This sets a flag (TRUE) only if all models assume normality
   is.normal<-is.family.normal(sem.functions)
   dag<-get.dag.from.sem(sem.functions)
+# the output of dag is the DAG part of the model without latents
   #This gives the names of the variables that are not latents
   not.latent.vars<-row.names(dag)
-  if(is.null(dependent.errors))equivalent.mag<-mag<-dag
+  if(is.null(dependent.errors) & is.null(selection.bias))equivalent.mag<-mag<-dag
   if(!is.null(dependent.errors)){
     #This adds free covariances to the adjacency matrix as "100"
     mag<-add.dependent.errors(DAG=dag,dependent.errors=dependent.errors)
-        x2<-MAG.to.DAG.in.pwSEM(mag)
-    #This gets the names of the latent variables that have been
-    #added in the extended DAG (x) to represent the free covariances
-    latents<-extract.latents(dag.with.latents=x2,not.latent.vars=not.latent.vars)
-    #This gets the d-separation equivalent DAG for this MAG
-    equivalent.mag<-DAG.to.MAG.in.pwSEM(full.DAG=x2,latents=latents,
-                                        conditioning.latents=NULL)
+print("after add.dependent.errors")
+    print(mag)
   }
+  if(!is.null(selection.bias)){
+    temp<-add.selection.bias(DAG=mag,dependent.errors=dependent.errors,
+                            selection.bias=selection.bias)
+    mag<-temp$MAG
+    print("after add.selection.bias")
+    print(mag)
+    print("selection bias latents")
+    print(temp$selection.bias.latents)
+  }
+  x2<-MAG.to.DAG.in.pwSEM(mag)
+  print("after MAG.to.DAG.in.pwSEM")
+  print(x2)
+  #This gets the names of the latent variables that have been
+  #added in the extended DAG (x2) to represent the free covariances
+  latents<-extract.latents(dag.with.latents=x2,not.latent.vars=not.latent.vars)
+  print("all latent vars:")
+  print(latents)
+  #This gets the d-separation equivalent DAG for this MAG
+  equivalent.mag<-DAG.to.MAG.in.pwSEM(full.DAG=x2,latents=latents,
+                  conditioning.latents=temp$selection.bias.latents)
+  print("equivalent.mag:")
+  print(equivalent.mag)
   basis.set<-basiSet.MAG(equivalent.mag)
+  print("basis set:")
+  print(basis.set)
   #  basis.set<-basiSet(equivalent.dag)
   if(!is.null(basis.set)){
     out.dsep<-test.dsep.claims(my.list=sem.functions,my.basis.set=basis.set,
@@ -176,16 +198,18 @@ pwSEM<-function(sem.functions,dependent.errors=NULL,data,
     dsep.null.probs<-out.dsep$null.probs
   }
   else C.stat<-p.C.stat<-dsep.null.probs<-NULL
-#refit sems to correct for parameter bias due to dependent
+#refit SEMs to correct for parameter bias due to dependent
 #errors and outputs (1)the new fits, (2) the response residuals
 #(3) the covariance, pearson and spearman matrices of the
 #residuals and (4)sem.modified which holds "yes" or "no" depending
 #on whether each sem function was modified due to dependent
 #residuals, (5)standardized.sem gives standardized values if all
 #variables are normal
+  print("before get.unbiased.sems")
   new.sems<-get.unbiased.sems(sem.functions=sem.functions,mag=mag,
       equivalent.mag=equivalent.mag,dat=data,
       all.grouping.vars=all.grouping.vars)
+  print(new.sems)
 #  sem.functions<-new.sems$sem.functions
 
   x<-list(causal.graph=mag,dsep.equivalent.causal.graph=equivalent.mag,basis.set=basis.set,
@@ -234,11 +258,20 @@ get.unbiased.sems<-function(sem.functions,mag,equivalent.mag,
   }
 
   mag2<-mag
-  #remove free covariances from the mag
+  #remove free covariances (100) and selection bias (10)
+  #from the mag
   mag2[mag==100]<-0
+  mag2[mag==10]<-0
   equivalent.mag2<-equivalent.mag
-  #remove free covariances from the equivalent mag
+  #remove free covariances (100) and selection bias (10)
+  #from the equivalent mag
   equivalent.mag2[equivalent.mag==100]<-0
+  equivalent.mag2[equivalent.mag==10]<-0
+  print("mag2")
+  print(mag2)
+  print("equivalent,mag2")
+  print(equivalent.mag2)
+
 #This holds the response residuals for each variable
   residual.values<-matrix(NA,ncol=ncol,nrow=nobs,
         dimnames=list(as.character(1:nobs),var.names[[1]]))
@@ -257,8 +290,8 @@ get.unbiased.sems<-function(sem.functions,mag,equivalent.mag,
     }
 
     #Compare the mag and equivalent.mag for this variable, after
-#replacing 100 (free covariance)
-    is.same<-mag2[,i]!=equivalent.mag2[,i]
+#replacing 100 (free covariance) and selection bias (10)
+    is.same<-mag2[,i]!= equivalent.mag2[,i]
 #these are the dependent variables that have to be added
     names.to.add<-var.names[[1]][is.same]
     if(sum(is.same)==0){
@@ -727,23 +760,56 @@ add.dependent.errors<-function(DAG,dependent.errors){
   #adjacency matrix as "100" to form a MAG
   #dependent.errors is a list containing free covariances in the
   #form of formulae: x~~y
+  if(is.null(dependent.errors))return(DAG)
   n.free<-length(dependent.errors)
   latent.names<-rep(NA,n.free)
   for(i in 1:n.free)
     latent.names[i]<-paste("L",as.character(i),sep="")
   var.names<-row.names(DAG)
   full.names<-c(var.names,latent.names)
+  print("dependent error names")
+  print(latent.names)
   n.vars<-length(var.names)
   MAG<-DAG
   var.nums<-1:n.vars
   for(i in 1:n.free){
     x<-as.character(dependent.errors[[i]])[2]
-    y<-gsub("~","",as.character(dependent.errors[[i]])[3])
+    y<-gsub(pattern="~",replacement="",x=as.character(dependent.errors[[i]])[3])
     x.index<-var.nums[full.names==x]
     y.index<-var.nums[full.names==y]
     MAG[x.index,y.index]<-MAG[y.index,x.index]<-100
   }
   MAG
+}
+
+add.selection.bias<-function(DAG,dependent.errors,selection.bias){
+  #This function takes a DAG and adds the selection bias to the
+  #adjacency matrix as "10" to form a MAG
+  #selection.bias is a list  in the
+  #form of formulae: x~~y
+  #returns the MAG and the latent variable names
+  if(is.null(selection.bias))return(list(MAG=DAG,selection.bias.latents=NULL))
+  n.free<-length(dependent.errors)
+  if(is.null(dependent.errors))n.free<-0
+  n.selection.bias<-length(selection.bias)
+  latent.names<-rep(NA,n.selection.bias)
+  for(i in 1:n.selection.bias)
+    latent.names[i]<-paste("L",as.character(i+n.free),sep="")
+  var.names<-row.names(DAG)
+  full.names<-c(var.names,latent.names)
+  print("selection bias latent names")
+  print(latent.names)
+  n.vars<-length(var.names)
+  MAG<-DAG
+  var.nums<-1:n.vars
+  for(i in 1:n.selection.bias){
+    x<-as.character(selection.bias[[i]])[2]
+    y<-gsub(pattern="~",replacement="",x=as.character(selection.bias[[i]])[3])
+    x.index<-var.nums[full.names==x]
+    y.index<-var.nums[full.names==y]
+    MAG[x.index,y.index]<-MAG[y.index,x.index]<-10
+  }
+  return(list(MAG=MAG,selection.bias.latents=latent.names))
 }
 
 MAG.to.DAG.in.pwSEM<-function(x){
