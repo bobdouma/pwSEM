@@ -162,6 +162,7 @@ pwSEM<-function(sem.functions,dependent.errors=NULL,selection.bias=NULL,data,
 print("after add.dependent.errors")
     print(mag)
   }
+  if(is.null(selection.bias))temp<-NULL
   if(!is.null(selection.bias)){
     temp<-add.selection.bias(DAG=mag,dependent.errors=dependent.errors,
                             selection.bias=selection.bias)
@@ -1035,7 +1036,7 @@ DAG.to.MAG.in.pwSEM<-function (full.DAG, latents = NA,
   # latents is a character vector giving the names of the latents
   # conditioning.latents is a character vector giving the names
   # of those latents that serve as conditioning variables for
-  # sampling (i.e. sampling bias)
+  # sampling (i.e. selection bias)
   # The final Mixed Acyclic graph is returned.
 
   ####################
