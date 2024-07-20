@@ -282,6 +282,8 @@ get.unbiased.sems<-function(sem.functions,mag,equivalent.mag,
   hold.dep.var.name<-rep(NA,ncol)
   #ncol is the number of variables in the mag
   for(i in 1:ncol){
+    print("i=")
+    print(i)
     if(inherits(sem.functions[[i]],"gam")){
       hold.dep.var.name[i]<-as.character(stats::formula(sem.functions[[i]])[2])
     }
@@ -292,8 +294,12 @@ get.unbiased.sems<-function(sem.functions,mag,equivalent.mag,
     #Compare the mag and equivalent.mag for this variable, after
 #replacing 100 (free covariance) and selection bias (10)
     is.same<-mag2[,i]!= equivalent.mag2[,i]
+    print("is.same:")
+    print(is.same)
 #these are the dependent variables that have to be added
     names.to.add<-var.names[[1]][is.same]
+    print("names.to.add:")
+    print(names.to.add)
     if(sum(is.same)==0){
 #calculate and store residuals using the original fits
 #since no new variables were added to the fits
@@ -320,18 +326,29 @@ get.unbiased.sems<-function(sem.functions,mag,equivalent.mag,
     if(sum(is.same)>0){
       sem.modified[i]<-"yes"
       n.to.add<-sum(is.same)
+      print("n.to.add:")
+      print(n.to.add)
       exclude.terms<-rep(NA,n.to.add)
       exclude.terms[1]<-paste(names.to.add[1],sep="")
       add.terms<-paste(names.to.add[1],
                        collapse=" + ",sep="")
-      for(j in 2:n.to.add){
+      print("exclude.terms:")
+      print(exclude.terms)
+      print("add.terms:")
+      print(add.terms)
+      if(n.to.add>1){
+       for(j in 2:n.to.add){
+        print("j=")
+        print(j)
 #add.terms holds the additional variables and code to extend the
 #model fit.  These will be linear fits in order to avoid problems
 #involving smoother degrees of freedom.
         add.terms<-paste(add.terms," + ",names.to.add[j],
                          collapse=" + ",sep="")
         exclude.terms[j]<-paste(names.to.add[j],sep="")
+        }
       }
+
       hold.excluded.terms[i,1:n.to.add]<-exclude.terms
 #add the extra variables from the equivalent mag and redo fit
       sem.functions[[i]]<-update.fun(sem.functions=sem.functions,
@@ -610,6 +627,9 @@ summary.pwSEM.class<-function(object,structural.equations=FALSE,...){
         cat(var.names[j]," ->",var.names[i],sep="",fill=T)
       if(object$causal.graph[i,j]==100)
         cat(var.names[i],"<->",var.names[j],sep="",fill=T)
+      if(object$causal.graph[i,j]==10)
+        cat(var.names[i],"---",var.names[j],sep="",fill=T)
+
     }
   }
   if(any(object$causal.graph!=object$dsep.equivalent.causal.graph)){
@@ -813,6 +833,7 @@ add.selection.bias<-function(DAG,dependent.errors,selection.bias){
 }
 
 MAG.to.DAG.in.pwSEM<-function(x){
+  #returns a DAG with latents from a MAG without latents
   #index.M returns a matrix giving the row and column numbers for
   #the pairs that are implicitly marginalized (X<->Y)
   #index.C returns a matrix giving the row and column numbers for
@@ -821,7 +842,13 @@ MAG.to.DAG.in.pwSEM<-function(x){
   index.M = which(x==100,arr.ind=T)
   n.M <- nrow(index.M)/2 # pairs with marginalized latents
   index.C<-which(x==10,arr.ind=T)
-  n.C<-nrow(index.C/2)/2 # pairs with conditioned latents
+  print("index.C:")
+  print(index.C)
+  n.C<-nrow(index.C)/2 # pairs with conditioned latents
+  print("n.C:")
+  print(n.C)
+  #if there are no marginalized or conditioned latents, return
+  if(n.M==0 & n.C==0)return(x)
   # new DAG including latent variables
   #set elements inrows and columns of latents to zero to start
   new.DAG <- matrix(0,ncol=ncol(x)+n.M+n.C,nrow=nrow(x)+n.M+n.C)
@@ -832,34 +859,43 @@ MAG.to.DAG.in.pwSEM<-function(x){
 
   colnames(new.DAG) <- c(colnames(x),paste("L",1:(n.M+n.C),sep=""))
   rownames(new.DAG) <- c(colnames(x),paste("L",1:(n.M+n.C),sep=""))
-  # modify for marginal latents...
-  # the marginal latents do not have causal parents, so set to zero
-  new.DAG[(nrow(x)+1):(nrow(x)+n.M),] <- 0
-  # find pairs of observed variables caused by the same latent
-  cat <- apply(index.M,1,paste,collapse="")
-  cat2 <- apply(index.M[,c(2,1)],1,paste,collapse="")
-  match <- match(cat,cat2) # matrix row number that has the second pair of the dependent error
-  # replace dependent error by directed path from Latent
-  no = 1
-  for (i in 1:n.M){
+  if(n.M>0){
+    # modify for marginal latents...
+    # the marginal latents do not have causal parents, so set to zero
+    new.DAG[(nrow(x)+1):(nrow(x)+n.M),] <- 0
+    # find pairs of observed variables caused by the same latent
+    cat <- apply(index.M,1,paste,collapse="")
+    cat2 <- apply(index.M[,c(2,1)],1,paste,collapse="")
+    match <- match(cat,cat2)
+    # matrix row number that has the second pair of the dependent error
+    # replace dependent error by directed path from Latent
+    no = 1
+   for (i in 1:n.M){
     new.DAG[ncol(x)+no,index.M[i,1]] <- 1
     new.DAG[ncol(x)+no,index.M[match[i],1]] <- 1
     no = no+1
     index.M <- index.M[-match[i],]
     if (no > n.M){stop}
+    }
   }
-  # find pairs of observed variables that are caused by the same latent
+
+  # find pairs of observed variables that are caused by the same
+  #latent
   cat <- apply(index.C,2,paste,collapse="")
   cat2 <- apply(index.C[,c(2,1)],1,paste,collapse="")
-  match <- match(cat,cat2) # matrix row number that has the second pair of the dependent error
+  match <- match(cat,cat2)
+  # matrix row number that has the
+  #second pair of the dependent error
   # replace dependent error by directed path from Latent
   #  no = 1
-  for (i in 1:n.C){
-    new.DAG[index.C[i,1],ncol(x)+no] <- 1
-    new.DAG[index.C[match[i],1],ncol(x)+no] <- 1
-    no = no+1
-    index.C <- index.C[-match[i],]
-    if (no > n.C){stop}
+  if(n.C>0){
+    for (i in 1:n.C){
+      new.DAG[index.C[i,1],ncol(x)+no] <- 1
+      new.DAG[index.C[match[i],1],ncol(x)+no] <- 1
+      no = no+1
+      index.C <- index.C[-match[i],]
+      if (no > n.C){stop}
+    }
   }
   new.DAG[new.DAG==100] <- 0
   new.DAG[new.DAG==10]<-0
