@@ -138,6 +138,16 @@ pwSEM<-function(sem.functions,dependent.errors=NULL,selection.bias=NULL,data,
   #remove lines with missing values, sort by grouping variables,
   #and add a new single grouping variable if there are no groups
 
+  #if the same pair (x,y) are in both dependent.errors and
+  #selection.bias, then return an error message
+  test.error<-test.latents.same.pair(dependent.errors,
+                                     selection.bias)
+  if(test.error){
+    print("ERROR: The same pair of observed variables are in both")
+    print("dependent.errors and selection.bias")
+  return("ERROR: The same pair of observed variables are in both
+         dependent.errors and selection.bias")
+    }
   data<-pwSEM.prepare.data.set(data=data,grouping.variables=all.grouping.vars)
   n.data.lines<-dim(data)[1]
 
@@ -270,7 +280,7 @@ get.unbiased.sems<-function(sem.functions,mag,equivalent.mag,
   equivalent.mag2[equivalent.mag==10]<-0
   print("mag2")
   print(mag2)
-  print("equivalent,mag2")
+  print("equivalent.mag2")
   print(equivalent.mag2)
 
 #This holds the response residuals for each variable
@@ -294,6 +304,8 @@ get.unbiased.sems<-function(sem.functions,mag,equivalent.mag,
 
     #Compare the mag and equivalent.mag for this variable, after
 #replacing 100 (free covariance) and selection bias (10)
+    #is.same is a logical vector with FALSE if row i is the same
+    #in both mag2 and equivalent.mag2
     is.same<-mag2[,i]!= equivalent.mag2[,i]
     print("is.same:")
     print(is.same)
@@ -302,6 +314,9 @@ get.unbiased.sems<-function(sem.functions,mag,equivalent.mag,
     print("names.to.add:")
     print(names.to.add)
     if(sum(is.same)==0){
+      print("i=")
+      print(i)
+      print("is.same==0")
 #calculate and store residuals using the original fits
 #since no new variables were added to the fits
 
@@ -774,6 +789,36 @@ summary.pwSEM.class<-function(object,structural.equations=FALSE,...){
     }
 
   }
+}
+
+test.latents.same.pair<-function(dependent.errors,selection.bias){
+  #This tests if the same pair of observed variables are listed
+  #in both depenent.errors and in selection.bias.  If TRUE then
+  #it returns TRUE and this is an error.
+  if(is.null(dependent.errors) | is.null(selection.bias)){
+    is.error<-FALSE
+    return(is.error)
+  }
+  de.matrix<-matrix(NA,ncol=2,nrow=length(dependent.errors))
+  sb.matrix<-matrix(NA,ncol=2,nrow=length(selection.bias))
+  for(i in 1:length(dependent.errors)){
+    de.matrix[i,1]<-as.character(dependent.errors[[i]])[2]
+    x<-strsplit(as.character(dependent.errors[[i]])[3], "")[[1]]
+    de.matrix[i,2]<-paste(x[2],x[3],sep="")
+  }
+  N.de.matrix<-dim(de.matrix)[1]
+  for(i in 1:length(selection.bias)){
+    sb.matrix[i,1]<-as.character(selection.bias[[i]])[2]
+    x<-strsplit(as.character(selection.bias[[i]])[3], "")[[1]]
+    sb.matrix[i,2]<-paste(x[2],x[3],sep="")
+  }
+  N.sb.matrix<-dim(sb.matrix)[1]
+  is.error<-FALSE
+  for(i in 1:N.de.matrix){
+    #If length(intersect(de.matrix[i,],sb.matrix))==2 then same!
+    if(length(intersect(de.matrix[i,],sb.matrix))==2)is.error<-TRUE
+  }
+  return(is.error)
 }
 
 add.dependent.errors<-function(DAG,dependent.errors){
