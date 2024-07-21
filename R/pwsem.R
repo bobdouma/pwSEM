@@ -393,20 +393,11 @@ get.unbiased.sems<-function(sem.functions,mag,equivalent.mag,
   if(is.normal & !is.mixed){
     no.match<-!(1:dim(dat)[2])%in%match(var.names[[1]],names(dat))
     #datA holds the scaled values for the variables in the MAG
-    print("var.names[[1]]")
-    print(var.names[[1]])
-    print("names(dat)")
-    print(names(dat))
     datA<-data.frame(scale(dat[,match(var.names[[1]],names(dat))]))
-    print("names(datA)")
-    print(names(datA))
     datB<-dat[,no.match]
     #dat2 holds the scaled values for the variables in the MAG plus
     #the other (grouping) variables
     dat2<-cbind(datA,datB)
-    print("names(dat2")
-    print(names(dat2))
-#    dimnames(dat2)<-dimnames(dat)
     for(i in 1:ncol){
       standardized.sem.functions[[i]]<-
         update.fun(sem.functions=sem.functions,i=i,all.grouping.vars =
