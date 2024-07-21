@@ -66,7 +66,7 @@ my.list<-list(mgcv::gam(X1~1,data=sim_poisson.no.nesting,family=gaussian),
          mgcv::gam(X2~X1,data=sim_poisson.no.nesting,family=poisson),
          mgcv::gam(X3~X2,data=sim_poisson.no.nesting,family=poisson),
          mgcv::gam(X4~X3,data=sim_poisson.no.nesting,family=poisson))
-out<-pwSEM(sem.functions=my.list,dependent.errors=list(X4~~X2),
+out<-pwSEM(sem.functions=my.list,marginalized.latents=list(X4~~X2),
           data=sim_poisson.no.nesting,use.permutations = TRUE,n.perms=10000)
 # To see each of the effects of X1 on X4 (only one in this example), we
 # use view.paths() while imputing the list of SEM functions (out$sem.functions)

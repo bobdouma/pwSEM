@@ -6,7 +6,8 @@
 \usage{
 pwSEM(
   sem.functions,
-  dependent.errors = NULL,
+  marginalized.latents = NULL,
+  conditioned.latents = NULL,
   data,
   use.permutations = FALSE,
   n.perms = 5000,
@@ -18,8 +19,11 @@ pwSEM(
 \item{sem.functions}{A list giving the gamm4 (gamm4 package) or gam (mgcv package) models associated with each
 variable in the sem, INCLUDING exogenous variables.}
 
-\item{dependent.errors}{A list giving any dependent errors (correlated error variables), given
-in the form of list(X~~Y,...,X~~Z).}
+\item{marginalized.latents}{A list giving any dependent errors (correlated error variables), given
+in the form of list(X~~Y,...,X~~Z). The same pair cannot also be listed in conditioned.latents.}
+
+\item{conditioned.latents}{A list giving any implicitly conditioned latents (selection bias), given
+in the form of list(X~~Y,...,X~~Z).  The same pair cannot also be listed in marginalized.latents.}
 
 \item{data}{A data frame containing the empirical data}
 
@@ -47,8 +51,8 @@ AIC, n.data.lines, use.permutations, n.perms
 }
 \description{
 This function performs a "piecewise" structural equation model without explicit latent variables
-(a "path" model),
-possibly including with dependent errors, based on generalized
+(a "path" model), including with implictly marginalized latents and
+implicitly conditioned latents, based on generalized
 linear or additive models, possibly in a mixed model context, and then tests
 the causal structure against an empirical data set using a dsep test.  Therefore, it is able to
 model linear, generalized linear, generalized linear mixed, additive, generalized additive, and
@@ -66,7 +70,7 @@ my.list<-list(mgcv::gam(X1~1,data=sim_normal.no.nesting,family=gaussian),
          mgcv::gam(X3~X2,data=sim_normal.no.nesting,family=gaussian),
          mgcv::gam(X4~X3,data=sim_normal.no.nesting,family=gaussian))
 # RUN THE pwSEM FUNCTION WITH PERMUTATION PROBABILITIES AND INCLUDING THE DEPENDENT ERRORS
-out<-pwSEM(sem.functions=my.list,dependent.errors=list(X4~~X2),
+out<-pwSEM(sem.functions=my.list,marginalized.latents=list(X4~~X2),
           data=sim_normal.no.nesting,use.permutations = TRUE)
 summary(out,structural.equations=TRUE)
 
@@ -82,7 +86,7 @@ my.list<-list(mgcv::gam(X1~1,data=sim_poisson.no.nesting,family=gaussian),
          mgcv::gam(X4~X3,data=sim_poisson.no.nesting,family=poisson))
 # RUN THE pwSEM FUNCTION WITH PERMUTATION PROBABILITIES WITH 10000
 # PERMUTATIONS AND INCLUDING THE DEPENDENT ERRORS
-out<-pwSEM(sem.functions=my.list,dependent.errors=list(X4~~X2),
+out<-pwSEM(sem.functions=my.list,marginalized.latents=list(X4~~X2),
           data=sim_poisson.no.nesting,use.permutations = TRUE,n.perms=10000)
 summary(out,structural.equations=TRUE)
 
@@ -97,7 +101,7 @@ my.list<-list(gamm4::gamm4(X1~1,random=~(1|group),data=sim_normal.with.nesting,f
          gamm4::gamm4(X3~X2,random=~(1|group),data=sim_normal.with.nesting,family=gaussian),
          gamm4::gamm4(X4~X3,random=~(1|group),data=sim_normal.with.nesting,family=gaussian))
 # RUN THE pwSEM FUNCTION WITH PERMUTATION PROBABILITIES AND INCLUDING THE DEPENDENT ERRORS
-out<-pwSEM(sem.functions=my.list,dependent.errors=list(X4~~X2),
+out<-pwSEM(sem.functions=my.list,marginalized.latents=list(X4~~X2),
           data=sim_normal.with.nesting,use.permutations = TRUE,
           do.smooth=TRUE,all.grouping.vars=c("group"))
 summary(out,structural.equations=TRUE)
@@ -112,7 +116,7 @@ my.list<-list(gamm4::gamm4(XF~1,random=~(1|nest)+(1|year),family="gaussian",data
    gamm4::gamm4(XH~XP+XF,random=~(1|nest)+(1|year),family="gaussian",data=nested_data),
    gamm4::gamm4(XR~XM+XH,family="binomial",random=~(1|nest)+(1|year),data=nested_data))
 summary(pwSEM(sem.functions=my.list,data=nested_data,
-      use.permutations=FALSE,do.smooth=FALSE,dependent.errors=list(XP~~XF),
+      use.permutations=FALSE,do.smooth=FALSE,marginalized.latents=list(XP~~XF),
       all.grouping.vars=c("nest","year")))
 
 # see vignette("pwSEM")

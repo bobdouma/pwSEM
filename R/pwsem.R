@@ -24,21 +24,23 @@ pwSEM.class<-function(x){
 #use_package("ggm")
 #use_package("gamm4")
 #use_package("mgcv")
+#use_package("poolr")
 
 #This is the code to create the documentation for the function
 #' @title The pwSEM function
 #' @description This function performs a "piecewise" structural equation model without explicit latent variables
-#' (a "path" model),
-#' possibly including with dependent errors, based on generalized
+#' (a "path" model), including with implictly marginalized latents and
+#' implicitly conditioned latents, based on generalized
 #' linear or additive models, possibly in a mixed model context, and then tests
 #' the causal structure against an empirical data set using a dsep test.  Therefore, it is able to
 #' model linear, generalized linear, generalized linear mixed, additive, generalized additive, and
 #' generalized additive mixed models.
 #' @param sem.functions A list giving the gamm4 (gamm4 package) or gam (mgcv package) models associated with each
 #' variable in the sem, INCLUDING exogenous variables.
-#'
-#' @param dependent.errors A list giving any dependent errors (correlated error variables), given
-#' in the form of list(X~~Y,...,X~~Z).
+#' @param conditioned.latents A list giving any implicitly conditioned latents (selection bias), given
+#' in the form of list(X~~Y,...,X~~Z).  The same pair cannot also be listed in marginalized.latents.
+#' @param marginalized.latents A list giving any dependent errors (correlated error variables), given
+#' in the form of list(X~~Y,...,X~~Z). The same pair cannot also be listed in conditioned.latents.
 #' @param data A data frame containing the empirical data
 #' @param use.permutations A logical value (TRUE, FALSE) indicating if you
 #' want to use permutation probabilities for the d-separation tests. Defaults
@@ -68,7 +70,7 @@ pwSEM.class<-function(x){
 #'          mgcv::gam(X3~X2,data=sim_normal.no.nesting,family=gaussian),
 #'          mgcv::gam(X4~X3,data=sim_normal.no.nesting,family=gaussian))
 #' # RUN THE pwSEM FUNCTION WITH PERMUTATION PROBABILITIES AND INCLUDING THE DEPENDENT ERRORS
-#' out<-pwSEM(sem.functions=my.list,dependent.errors=list(X4~~X2),
+#' out<-pwSEM(sem.functions=my.list,marginalized.latents=list(X4~~X2),
 #'           data=sim_normal.no.nesting,use.permutations = TRUE)
 #' summary(out,structural.equations=TRUE)
 #'
@@ -84,7 +86,7 @@ pwSEM.class<-function(x){
 #'          mgcv::gam(X4~X3,data=sim_poisson.no.nesting,family=poisson))
 #' # RUN THE pwSEM FUNCTION WITH PERMUTATION PROBABILITIES WITH 10000
 #' # PERMUTATIONS AND INCLUDING THE DEPENDENT ERRORS
-#' out<-pwSEM(sem.functions=my.list,dependent.errors=list(X4~~X2),
+#' out<-pwSEM(sem.functions=my.list,marginalized.latents=list(X4~~X2),
 #'           data=sim_poisson.no.nesting,use.permutations = TRUE,n.perms=10000)
 #' summary(out,structural.equations=TRUE)
 #'
@@ -99,7 +101,7 @@ pwSEM.class<-function(x){
 #'          gamm4::gamm4(X3~X2,random=~(1|group),data=sim_normal.with.nesting,family=gaussian),
 #'          gamm4::gamm4(X4~X3,random=~(1|group),data=sim_normal.with.nesting,family=gaussian))
 #' # RUN THE pwSEM FUNCTION WITH PERMUTATION PROBABILITIES AND INCLUDING THE DEPENDENT ERRORS
-#' out<-pwSEM(sem.functions=my.list,dependent.errors=list(X4~~X2),
+#' out<-pwSEM(sem.functions=my.list,marginalized.latents=list(X4~~X2),
 #'           data=sim_normal.with.nesting,use.permutations = TRUE,
 #'           do.smooth=TRUE,all.grouping.vars=c("group"))
 #' summary(out,structural.equations=TRUE)
@@ -116,21 +118,21 @@ pwSEM.class<-function(x){
 #'    gamm4::gamm4(XR~XM+XH,family="binomial",random=~(1|nest)+(1|year),data=nested_data))
 
 #' summary(pwSEM(sem.functions=my.list,data=nested_data,
-#'       use.permutations=FALSE,do.smooth=FALSE,dependent.errors=list(XP~~XF),
+#'       use.permutations=FALSE,do.smooth=FALSE,marginalized.latents=list(XP~~XF),
 #'       all.grouping.vars=c("nest","year")))
 #'
 #'# see vignette("pwSEM")
 #'
 #' @export
-pwSEM<-function(sem.functions,dependent.errors=NULL,selection.bias=NULL,data,
+pwSEM<-function(sem.functions,marginalized.latents=NULL,conditioned.latents=NULL,data,
                 use.permutations=FALSE,n.perms=5000,do.smooth=FALSE,
                 all.grouping.vars=NULL){
   #
   #sem.functions is a list giving the gamm4 or gam models associated with each
   #variable in the sem, including exogenous variables.
-  #dependent.errors is a list giving any free covariances, given
+  #marginalized.latents is a list giving any free covariances, given
   #in the form of X~~y
-  #selection.bias is a list giving any selection bias, given
+  #conditioned.latents is a list giving any selection bias, given
   #in the form of x-y
   #all.grouping.vars is a character vector giving the names of all
   #variables involved in the sem functions that define groups for
@@ -138,15 +140,15 @@ pwSEM<-function(sem.functions,dependent.errors=NULL,selection.bias=NULL,data,
   #remove lines with missing values, sort by grouping variables,
   #and add a new single grouping variable if there are no groups
 
-  #if the same pair (x,y) are in both dependent.errors and
-  #selection.bias, then return an error message
-  test.error<-test.latents.same.pair(dependent.errors,
-                                     selection.bias)
+  #if the same pair (x,y) are in both marginalized.latents and
+  #conditioned.latents, then return an error message
+  test.error<-test.latents.same.pair(marginalized.latents,
+                                     conditioned.latents)
   if(test.error){
     print("ERROR: The same pair of observed variables are in both")
-    print("dependent.errors and selection.bias")
+    print("marginalized.latents and conditioned.latents")
   return("ERROR: The same pair of observed variables are in both
-         dependent.errors and selection.bias")
+         marginalized.latents and conditioned.latents")
     }
   data<-pwSEM.prepare.data.set(data=data,grouping.variables=all.grouping.vars)
   n.data.lines<-dim(data)[1]
@@ -165,39 +167,30 @@ pwSEM<-function(sem.functions,dependent.errors=NULL,selection.bias=NULL,data,
 # the output of dag is the DAG part of the model without latents
   #This gives the names of the variables that are not latents
   not.latent.vars<-row.names(dag)
-  if(is.null(dependent.errors) & is.null(selection.bias))equivalent.mag<-mag<-dag
-  if(!is.null(dependent.errors)){
-    #This adds free covariances to the adjacency matrix as "100"
-    mag<-add.dependent.errors(DAG=dag,dependent.errors=dependent.errors)
-print("after add.dependent.errors")
-    print(mag)
+  if(is.null(marginalized.latents) & is.null(conditioned.latents)){
+    equivalent.mag<-mag<-dag
+    no.latents<-TRUE
   }
-  if(is.null(selection.bias))temp<-NULL
-  if(!is.null(selection.bias)){
-    temp<-add.selection.bias(DAG=mag,dependent.errors=dependent.errors,
-                            selection.bias=selection.bias)
+  if(!is.null(marginalized.latents)){
+    #This adds free covariances to the adjacency matrix as "100"
+    mag<-add.marginalized.latents(DAG=dag,marginalized.latents=marginalized.latents)
+    no.latents<-FALSE
+  }
+  if(is.null(conditioned.latents))temp<-NULL
+  if(!is.null(conditioned.latents)){
+    temp<-add.conditioned.latents(DAG=mag,marginalized.latents=marginalized.latents,
+                            conditioned.latents=conditioned.latents)
     mag<-temp$MAG
-    print("after add.selection.bias")
-    print(mag)
-    print("selection bias latents")
-    print(temp$selection.bias.latents)
+    no.latents<-FALSE
   }
   x2<-MAG.to.DAG.in.pwSEM(mag)
-  print("after MAG.to.DAG.in.pwSEM")
-  print(x2)
   #This gets the names of the latent variables that have been
   #added in the extended DAG (x2) to represent the free covariances
   latents<-extract.latents(dag.with.latents=x2,not.latent.vars=not.latent.vars)
-  print("all latent vars:")
-  print(latents)
   #This gets the d-separation equivalent DAG for this MAG
   equivalent.mag<-DAG.to.MAG.in.pwSEM(full.DAG=x2,latents=latents,
-                  conditioning.latents=temp$selection.bias.latents)
-  print("equivalent.mag:")
-  print(equivalent.mag)
+                  conditioning.latents=temp$conditioned.latents.latents)
   basis.set<-basiSet.MAG(equivalent.mag)
-  print("basis set:")
-  print(basis.set)
   #  basis.set<-basiSet(equivalent.dag)
   if(!is.null(basis.set)){
     out.dsep<-test.dsep.claims(my.list=sem.functions,my.basis.set=basis.set,
@@ -207,6 +200,7 @@ print("after add.dependent.errors")
     C.stat<--2*sum(log(out.dsep$null.probs))
     p.C.stat<-1-stats::pchisq(C.stat,df=2*length(out.dsep$null.probs))
     dsep.null.probs<-out.dsep$null.probs
+#    Brown.correction<-poolr::fisher()
   }
   else C.stat<-p.C.stat<-dsep.null.probs<-NULL
 #refit SEMs to correct for parameter bias due to dependent
@@ -216,11 +210,9 @@ print("after add.dependent.errors")
 #on whether each sem function was modified due to dependent
 #residuals, (5)standardized.sem gives standardized values if all
 #variables are normal
-  print("before get.unbiased.sems")
   new.sems<-get.unbiased.sems(sem.functions=sem.functions,mag=mag,
       equivalent.mag=equivalent.mag,dat=data,
       all.grouping.vars=all.grouping.vars)
-  print(new.sems)
 #  sem.functions<-new.sems$sem.functions
 
   x<-list(causal.graph=mag,dsep.equivalent.causal.graph=equivalent.mag,basis.set=basis.set,
@@ -233,8 +225,8 @@ print("after add.dependent.errors")
           residual.spearman.matrix=new.sems$spearman.matrix,
           sem.modified=new.sems$sem.modified,standardized.sem=
           new.sems$standardized.sem.functions,excluded.terms=
-            new.sems$excluded.terms,dependent.errors=
-            dependent.errors,response.residuals=
+            new.sems$excluded.terms,marginalized.latents=
+            marginalized.latents,response.residuals=
             new.sems$residual.values)
 #The AIC statistic is based on the sems of the equivalent mag
     class(x)<-"pwSEM.class"
@@ -278,10 +270,6 @@ get.unbiased.sems<-function(sem.functions,mag,equivalent.mag,
   #from the equivalent mag
   equivalent.mag2[equivalent.mag==100]<-0
   equivalent.mag2[equivalent.mag==10]<-0
-  print("mag2")
-  print(mag2)
-  print("equivalent.mag2")
-  print(equivalent.mag2)
 
 #This holds the response residuals for each variable
   residual.values<-matrix(NA,ncol=ncol,nrow=nobs,
@@ -293,8 +281,6 @@ get.unbiased.sems<-function(sem.functions,mag,equivalent.mag,
   hold.dep.var.name<-rep(NA,ncol)
   #ncol is the number of variables in the mag
   for(i in 1:ncol){
-    print("i=")
-    print(i)
     if(inherits(sem.functions[[i]],"gam")){
       hold.dep.var.name[i]<-as.character(stats::formula(sem.functions[[i]])[2])
     }
@@ -307,16 +293,9 @@ get.unbiased.sems<-function(sem.functions,mag,equivalent.mag,
     #is.same is a logical vector with FALSE if row i is the same
     #in both mag2 and equivalent.mag2
     is.same<-mag2[,i]!= equivalent.mag2[,i]
-    print("is.same:")
-    print(is.same)
 #these are the dependent variables that have to be added
     names.to.add<-var.names[[1]][is.same]
-    print("names.to.add:")
-    print(names.to.add)
     if(sum(is.same)==0){
-      print("i=")
-      print(i)
-      print("is.same==0")
 #calculate and store residuals using the original fits
 #since no new variables were added to the fits
 
@@ -342,20 +321,12 @@ get.unbiased.sems<-function(sem.functions,mag,equivalent.mag,
     if(sum(is.same)>0){
       sem.modified[i]<-"yes"
       n.to.add<-sum(is.same)
-      print("n.to.add:")
-      print(n.to.add)
       exclude.terms<-rep(NA,n.to.add)
       exclude.terms[1]<-paste(names.to.add[1],sep="")
       add.terms<-paste(names.to.add[1],
                        collapse=" + ",sep="")
-      print("exclude.terms:")
-      print(exclude.terms)
-      print("add.terms:")
-      print(add.terms)
       if(n.to.add>1){
        for(j in 2:n.to.add){
-        print("j=")
-        print(j)
 #add.terms holds the additional variables and code to extend the
 #model fit.  These will be linear fits in order to avoid problems
 #involving smoother degrees of freedom.
@@ -434,7 +405,6 @@ get.unbiased.sems<-function(sem.functions,mag,equivalent.mag,
     residual.values)
 }
 
-#' @export
 update.fun<-function(sem.functions,i,all.grouping.vars,add.terms,data){
   #This function updates a gamm4 or gam model by adding the terms in "add.terms"
   #to the model formula and returning the fitted model
@@ -764,15 +734,15 @@ summary.pwSEM.class<-function(object,structural.equations=FALSE,...){
     }
     #finished for(i in 1:nfuns) loop...
     cat("\n")
-    n.free<-length(object$dependent.errors)
+    n.free<-length(object$marginalized.latents)
     if(n.free>0){
       for(ij in 1:n.free){
         cat("          _________ Dependent Errors _________________","\n")
         dep.var.names<-colnames(object$residual.pearson.matrix)
         var.numbers<-1:length(var.names)
-        print(object$dependent.errors[ij])
-        x<-as.character(object$dependent.errors[[ij]][2])
-        y<-gsub("~","",as.character(object$dependent.errors[[ij]][3]))
+        print(object$marginalized.latents[ij])
+        x<-as.character(object$marginalized.latents[[ij]][2])
+        y<-gsub("~","",as.character(object$marginalized.latents[[ij]][3]))
         x.index<-var.nums[dep.var.names==x]
         y.index<-var.nums[dep.var.names==y]
         if(is.family.normal(object$sem.functions)){
@@ -791,25 +761,25 @@ summary.pwSEM.class<-function(object,structural.equations=FALSE,...){
   }
 }
 
-test.latents.same.pair<-function(dependent.errors,selection.bias){
+test.latents.same.pair<-function(marginalized.latents,conditioned.latents){
   #This tests if the same pair of observed variables are listed
-  #in both depenent.errors and in selection.bias.  If TRUE then
+  #in both depenent.errors and in conditioned.latents.  If TRUE then
   #it returns TRUE and this is an error.
-  if(is.null(dependent.errors) | is.null(selection.bias)){
+  if(is.null(marginalized.latents) | is.null(conditioned.latents)){
     is.error<-FALSE
     return(is.error)
   }
-  de.matrix<-matrix(NA,ncol=2,nrow=length(dependent.errors))
-  sb.matrix<-matrix(NA,ncol=2,nrow=length(selection.bias))
-  for(i in 1:length(dependent.errors)){
-    de.matrix[i,1]<-as.character(dependent.errors[[i]])[2]
-    x<-strsplit(as.character(dependent.errors[[i]])[3], "")[[1]]
+  de.matrix<-matrix(NA,ncol=2,nrow=length(marginalized.latents))
+  sb.matrix<-matrix(NA,ncol=2,nrow=length(conditioned.latents))
+  for(i in 1:length(marginalized.latents)){
+    de.matrix[i,1]<-as.character(marginalized.latents[[i]])[2]
+    x<-strsplit(as.character(marginalized.latents[[i]])[3], "")[[1]]
     de.matrix[i,2]<-paste(x[2],x[3],sep="")
   }
   N.de.matrix<-dim(de.matrix)[1]
-  for(i in 1:length(selection.bias)){
-    sb.matrix[i,1]<-as.character(selection.bias[[i]])[2]
-    x<-strsplit(as.character(selection.bias[[i]])[3], "")[[1]]
+  for(i in 1:length(conditioned.latents)){
+    sb.matrix[i,1]<-as.character(conditioned.latents[[i]])[2]
+    x<-strsplit(as.character(conditioned.latents[[i]])[3], "")[[1]]
     sb.matrix[i,2]<-paste(x[2],x[3],sep="")
   }
   N.sb.matrix<-dim(sb.matrix)[1]
@@ -821,26 +791,24 @@ test.latents.same.pair<-function(dependent.errors,selection.bias){
   return(is.error)
 }
 
-add.dependent.errors<-function(DAG,dependent.errors){
+add.marginalized.latents<-function(DAG,marginalized.latents){
   #This function takes a DAG and adds the free covariances to the
   #adjacency matrix as "100" to form a MAG
-  #dependent.errors is a list containing free covariances in the
+  #marginalized.latents is a list containing free covariances in the
   #form of formulae: x~~y
-  if(is.null(dependent.errors))return(DAG)
-  n.free<-length(dependent.errors)
+  if(is.null(marginalized.latents))return(DAG)
+  n.free<-length(marginalized.latents)
   latent.names<-rep(NA,n.free)
   for(i in 1:n.free)
     latent.names[i]<-paste("L",as.character(i),sep="")
   var.names<-row.names(DAG)
   full.names<-c(var.names,latent.names)
-  print("dependent error names")
-  print(latent.names)
   n.vars<-length(var.names)
   MAG<-DAG
   var.nums<-1:n.vars
   for(i in 1:n.free){
-    x<-as.character(dependent.errors[[i]])[2]
-    y<-gsub(pattern="~",replacement="",x=as.character(dependent.errors[[i]])[3])
+    x<-as.character(marginalized.latents[[i]])[2]
+    y<-gsub(pattern="~",replacement="",x=as.character(marginalized.latents[[i]])[3])
     x.index<-var.nums[full.names==x]
     y.index<-var.nums[full.names==y]
     MAG[x.index,y.index]<-MAG[y.index,x.index]<-100
@@ -848,34 +816,32 @@ add.dependent.errors<-function(DAG,dependent.errors){
   MAG
 }
 
-add.selection.bias<-function(DAG,dependent.errors,selection.bias){
+add.conditioned.latents<-function(DAG,marginalized.latents,conditioned.latents){
   #This function takes a DAG and adds the selection bias to the
   #adjacency matrix as "10" to form a MAG
-  #selection.bias is a list  in the
+  #conditioned.latents is a list  in the
   #form of formulae: x~~y
   #returns the MAG and the latent variable names
-  if(is.null(selection.bias))return(list(MAG=DAG,selection.bias.latents=NULL))
-  n.free<-length(dependent.errors)
-  if(is.null(dependent.errors))n.free<-0
-  n.selection.bias<-length(selection.bias)
-  latent.names<-rep(NA,n.selection.bias)
-  for(i in 1:n.selection.bias)
+  if(is.null(conditioned.latents))return(list(MAG=DAG,conditioned.latents.latents=NULL))
+  n.free<-length(marginalized.latents)
+  if(is.null(marginalized.latents))n.free<-0
+  n.conditioned.latents<-length(conditioned.latents)
+  latent.names<-rep(NA,n.conditioned.latents)
+  for(i in 1:n.conditioned.latents)
     latent.names[i]<-paste("L",as.character(i+n.free),sep="")
   var.names<-row.names(DAG)
   full.names<-c(var.names,latent.names)
-  print("selection bias latent names")
-  print(latent.names)
   n.vars<-length(var.names)
   MAG<-DAG
   var.nums<-1:n.vars
-  for(i in 1:n.selection.bias){
-    x<-as.character(selection.bias[[i]])[2]
-    y<-gsub(pattern="~",replacement="",x=as.character(selection.bias[[i]])[3])
+  for(i in 1:n.conditioned.latents){
+    x<-as.character(conditioned.latents[[i]])[2]
+    y<-gsub(pattern="~",replacement="",x=as.character(conditioned.latents[[i]])[3])
     x.index<-var.nums[full.names==x]
     y.index<-var.nums[full.names==y]
     MAG[x.index,y.index]<-MAG[y.index,x.index]<-10
   }
-  return(list(MAG=MAG,selection.bias.latents=latent.names))
+  return(list(MAG=MAG,conditioned.latents.latents=latent.names))
 }
 
 MAG.to.DAG.in.pwSEM<-function(x){
@@ -888,11 +854,7 @@ MAG.to.DAG.in.pwSEM<-function(x){
   index.M = which(x==100,arr.ind=T)
   n.M <- nrow(index.M)/2 # pairs with marginalized latents
   index.C<-which(x==10,arr.ind=T)
-  print("index.C:")
-  print(index.C)
   n.C<-nrow(index.C)/2 # pairs with conditioned latents
-  print("n.C:")
-  print(n.C)
   #if there are no marginalized or conditioned latents, return
   if(n.M==0 & n.C==0)return(x)
   # new DAG including latent variables
@@ -1084,15 +1046,13 @@ DAG.to.MAG.in.pwSEM<-function (full.DAG, latents = NA,
   # sampling (i.e. selection bias)
   # The final Mixed Acyclic graph is returned.
 
-  ####################
-
   #Requires the ggm library
   #First, make sure that the conditioning latents, if present, are a subset
   # of the declared latents.  If not, stop.
   if(test.conditioning.latents.in.pwSEM(latents,conditioning.latents)!=0){
     stop("Conditioning latents must be a proper subset of all latents")
   }
-  #########################################
+
   # main function
   #
   full.vars<-row.names(full.DAG)
@@ -1623,7 +1583,7 @@ extract.variable.info.from.gam<-function(fo){
 #'          mgcv::gam(X2~X1,data=sim_poisson.no.nesting,family=poisson),
 #'          mgcv::gam(X3~X2,data=sim_poisson.no.nesting,family=poisson),
 #'          mgcv::gam(X4~X3,data=sim_poisson.no.nesting,family=poisson))
-#' out<-pwSEM(sem.functions=my.list,dependent.errors=list(X4~~X2),
+#' out<-pwSEM(sem.functions=my.list,marginalized.latents=list(X4~~X2),
 #'           data=sim_poisson.no.nesting,use.permutations = TRUE,n.perms=10000)
 #' # To see each of the effects of X1 on X4 (only one in this example), we
 #' # use view.paths() while imputing the list of SEM functions (out$sem.functions)
