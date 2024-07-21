@@ -72,7 +72,7 @@ pwSEM(sem.functions,marginalized.latents = NULL, conditioned.latents = NULL, dat
 
 ### Example 1: dependent endogenous errors, normally distributed variables and no nesting structure in the data
 
-Consider first a causal hypothesis in which X1-->X2-->X3-->X4 and with dependent errors between X2 and X4 due to a common implicitly marginalized latent cause.  If we assume that all four variables are normally distributed, linearly related, and with mutually independent observations (i.e. no nesting structure that would require a mixed model formulation), then we can model the structural equations using the gam() function of the mgcv package without any smoother terms.  For instance, the first link (X1-->X2) would be modelled as gam(X2~X1,data=...,family=gaussian).  This version of gam is equivalent to the lm() function that is well-known to R users: lm(X2~X1,data=...).  As a note, if you believe that the functional relationship between X2 and X1 is nonlinear, you could instead model this as gam(X2~s(X1),data=...,family=gaussian).  The pwSEM() function will accommodate this formulation but cannot include more complicated formulations like changing the number of knots such as gam(X2~s(X1,k=4),data=...,family=gaussian).  
+Consider first a causal hypothesis in which X1-->X2-->X3-->X4 and with dependent errors between X2 and X4 due to a common implicitly marginalized latent cause.  If we assume that all four variables are normally distributed, linearly related, and with mutually independent observations (i.e. no nesting structure that would require a mixed model formulation), then we can model the structural equations using the gam() function of the mgcv package without any smoother terms.  For instance, the first link (X1-->X2) would be modelled as gam(X2~X1,data=...,family=gaussian).  This version of gam is equivalent to the lm() function that is well-known to R users: lm(X2~X1,data=...).  As a note, if you believe that the functional relationship between X2 and X1 is nonlinear, you could instead model this as gam(X2~s(X1),data=...,family=gaussian).  The pwSEM() function will accommodate this formulation but cannot include more complicated formulations like changing the number of knots, for example gam(X2~s(X1,k=4),data=...,family=gaussian).  
 
 Here are the three steps, using the "sim_normal.no.nesting" data set that is included with the pwSEM package:
 
@@ -93,8 +93,8 @@ Notice that the first model in the list is for X1, which is an exogenous variabl
 STEP 2: call the pwSEM function
 
 ```{r}
-out<-pwSEM(sem.functions=my.list,marginalized.latents=list(X4~~X2),
-  data=sim_normal.no.nesting,use.permutations = TRUE,n.perms=5000,do.smooth=FALSE,all.grouping.vars = NULL)
+out<-pwSEM(sem.functions=my.list,
+    marginalized.latents=list(X4~~X2), data=sim_normal.no.nesting,use.permutations = TRUE,n.perms=5000,do.smooth=FALSE,all.grouping.vars = NULL)
 ```
 
 The first argument gives the list containing the structural equations.
@@ -130,7 +130,8 @@ my.list<-list(mgcv::gam(X1~1,data=sim_poisson.no.nesting,family=gaussian),
          mgcv::gam(X2~X1,data=sim_poisson.no.nesting,family=poisson),
          mgcv::gam(X3~X2,data=sim_poisson.no.nesting,family=poisson),
          mgcv::gam(X4~X3,data=sim_poisson.no.nesting,family=poisson))
-out<-pwSEM(sem.functions=my.list,marginalized.latents=list(X4~~X2), data=sim_poisson.no.nesting,use.permutations = TRUE,n.perms=10000)
+out<-pwSEM(sem.functions=my.list,
+           marginalized.latents=list(X4~~X2),   data=sim_poisson.no.nesting,use.permutations = TRUE,n.perms=10000)
 summary(out,structural.equations=TRUE)
 ```
 Since each dependent variable in the model is now Poisson distributed, the slopes of the structural equations are for the ln-transformed values since this is the link function for Poisson distributed variables in a generalized linear model.  If you want to express the structural equations in the original scale of these variables, you must back-transform.  For example, the second structural equation is (implicitly) ln(X2)=0.25+0.17X1 even though the ln-transform isn't explicit.  To get this structural equation in the original scale of X2 you would do: exp(0.25)*exp(0.17X1).
@@ -153,7 +154,8 @@ my.list<-list(gamm4::gamm4(X1~1,random=~(1|group),data=sim_normal.with.nesting,f
          gamm4::gamm4(X3~X2,random=~(1|group),data=sim_normal.with.nesting,family=gaussian),
          gamm4::gamm4(X4~X3,random=~(1|group),data=sim_normal.with.nesting,family=gaussian))
 
-out<-pwSEM(sem.functions=my.list,marginalized.latents=list(X4~~X2),
+out<-pwSEM(sem.functions=my.list,
+           marginalized.latents=list(X4~~X2),
    data=sim_normal.with.nesting,use.permutations = TRUE,
    do.smooth=TRUE,all.grouping.vars=c("group"))
 summary(out,structural.equations=TRUE)
@@ -165,8 +167,8 @@ Modelling the structural equations in the pwSEM package uses the mgcv package;  
 
 Wood, S.N. (2017).  Generalized Additive Models: An introduction with R, 2nd edition.  CRC Press, Taylor & Francis Group. Boca Raton, FL, USA.
 
-The use of the mgcv package, and the two model functions "gam" and "gamm4", allow a very wide range of models.  If you want linear models, then use "gam" or "gamm4" without any smoother terms.  For example gam(Y~X,...) fits a linear relationship between Y and X while gam(Y~s(X),...) will fit a smoother function that is not linear unless the underlying relationship is truly linear (and you have lots of data).  The smoother operator "s()" can also be used in gamm4.  If you specify distributions other than "gaussian" (i.e. normal) in the family= argument, then you will model non-normal data.  If you want to include a random component to the model (for example, to account for nested data), then use the gamm4 function.
-*Note that not all of the functionality of these two functions is accepted in this version of pwSEM*.  For instance, you can somewhat control the degree of nonlinearity ("wigglyness") of smoother splines via s(X, k=) or other types of smoother splines, but pwSEM cannot accommodate this.  If your SEMs are sufficiently complicated to require this, then it is best to do this individually rather than via pwSEM.  Certainly, more complicated modelling of generalized linear and generalized additive models, with or without a random component (i.e. mixed models) requires that you have a good knowledge of this field!
+The use of the mgcv package, and the two model functions "gam" and "gamm4", allow for a very wide range of models.  If you want linear models, then use "gam" or "gamm4" without any smoother terms.  For example gam(Y~X,...) fits a linear relationship between Y and X while gam(Y~s(X),...) will fit a smoother function that is not linear unless the underlying relationship is truly linear (and you have lots of data).  The smoother operator "s()" can also be used in gamm4.  If you specify distributions other than "gaussian" (i.e. normal) in the family= argument, then you will model non-normal data.  If you want to include a random component to the model (for example, to account for nested data), then use the gamm4 function.
+*Note that not all of the functionality of these two functions is accepted in this version of pwSEM*.  For instance, you can somewhat control the degree of nonlinearity ("wigglyness") of smoother splines via s(X, k=) or other types of smoother splines, but pwSEM cannot accommodate this; instead, it uses the default choice.  If your SEMs are sufficiently complicated to require this, then it is best to do this individually rather than via pwSEM.  Certainly, more complicated modelling of generalized linear and generalized additive models, with or without a random component (i.e. mixed models) requires that you have a good knowledge of this field!
 For instance, fitting models with a Poisson distribution (i.e. family=poisson) can run into problems when there are lots of zero values even though the model might converge without throwing out any error or warning messages.  You could try a zero-inflated version but this is not something for beginners...
 
 

@@ -15,7 +15,8 @@ Imports:
     gamm4,
     ggm,
     igraph,
-    mgcv
+    mgcv,
+    poolr
 Suggests:
     knitr,
     rmarkdown,
