@@ -21,7 +21,7 @@ pwSEM.class<-function(x){
   structure(x,class="pwSEM.class")
 }
 
-#use_package("ggm")
+#usethis::use_package("ggm")
 #use_package("gamm4")
 #use_package("mgcv")
 #use_package("poolr")
@@ -203,10 +203,10 @@ pwSEM<-function(sem.functions,marginalized.latents=NULL,conditioned.latents=NULL
   #This is Brown's correction for correlated tests
   #out.dsep$correlations.PoR is the correlation matrix for the tests
     Brown.correction.p<-p.C.stat
+    mvnconv.R<-poolr::mvnconv(out.dsep$correlations.PoR)
     if(length(out.dsep$null.probs)>1){
      Brown.correction.p<-poolr::fisher(out.dsep$null.probs,
-        R=poolr::mvnconv(out.dsep$correlations.PoR),
-        adjust="generalized")$p
+        R=mvnconv.R,adjust="generalized")$p
     }
   }
   else C.stat<-p.C.stat<-dsep.null.probs<-NULL
@@ -610,7 +610,7 @@ test.dsep.claims<-function(my.list,my.basis.set,data,use.permutations=FALSE,
     }
   }
   list(basis.set=my.basis.set,null.probs=out$probs,
-       correlations.PoR=cor(PoR))
+       correlations.PoR=stats::cor(PoR))
 }
 
 #' @export
