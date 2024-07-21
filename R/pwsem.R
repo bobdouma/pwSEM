@@ -200,7 +200,14 @@ pwSEM<-function(sem.functions,marginalized.latents=NULL,conditioned.latents=NULL
     C.stat<--2*sum(log(out.dsep$null.probs))
     p.C.stat<-1-stats::pchisq(C.stat,df=2*length(out.dsep$null.probs))
     dsep.null.probs<-out.dsep$null.probs
-#    Brown.correction<-poolr::fisher()
+  #This is Brown's correction for correlated tests
+  #out.dsep$correlations.PoR is the correlation matrix for the tests
+    Brown.correction.p<-p.C.stat
+    if(length(out.dsep$null.probs)>1){
+     Brown.correction.p<-poolr::fisher(out.dsep$null.probs,
+        R=poolr::mvnconv(out.dsep$correlations.PoR),
+        adjust="generalized")$p
+    }
   }
   else C.stat<-p.C.stat<-dsep.null.probs<-NULL
 #refit SEMs to correct for parameter bias due to dependent
@@ -216,8 +223,11 @@ pwSEM<-function(sem.functions,marginalized.latents=NULL,conditioned.latents=NULL
 #  sem.functions<-new.sems$sem.functions
 
   x<-list(causal.graph=mag,dsep.equivalent.causal.graph=equivalent.mag,basis.set=basis.set,
-          dsep.probs=dsep.null.probs,sem.functions=new.sems$sem.functions,
+          dsep.probs=dsep.null.probs,
+          sem.functions=new.sems$sem.functions,
           C.statistic=C.stat,prob.C.statistic=p.C.stat,
+          Brown.correction.p=Brown.correction.p,
+          R.correlated.tests=out.dsep$correlations.PoR,
           AIC=get.AIC(new.sems$sem.functions),n.data.lines=n.data.lines,
           use.permutations=use.permutations,n.perms=n.perms,
           residual.cov.matrix=new.sems$covariance.matrix,
@@ -579,13 +589,18 @@ test.dsep.claims<-function(my.list,my.basis.set,data,use.permutations=FALSE,
                            n.perms=5000,do.smooth=FALSE,all.grouping.vars,
                            observed.vars){
   #dsep.claims are the elements returned in basiSet()
+  #RETURNS: basis.set=my.basis.set,null.probs=out$probs,
+  #          correlations.PoR=cor(PoR)
   n.claims<-length(my.basis.set)
   out<-data.frame(probs=rep(NA,n.claims))
   n.lines<-dim(data)[1]
+  #collect products of residuals
+  PoR<-matrix(NA,nrow=n.lines,ncol=n.claims)
   for(i in 1:n.claims){
     y<-get.residuals(my.list=my.list,dsep=my.basis.set[[i]],data=data,
                      do.smooth=do.smooth,all.grouping.vars=all.grouping.vars,
                      observed.vars=observed.vars)
+    PoR[,i]<-y$residuals1*y$residuals2
     if(!use.permutations){
       out$probs[i]<-generalized.covariance(R1=y$residuals1,R2=y$residuals2)$prob
     }
@@ -594,7 +609,8 @@ test.dsep.claims<-function(my.list,my.basis.set,data,use.permutations=FALSE,
                                                 R2=y$residuals2,nperm=n.perms)$permutation.prob
     }
   }
-  list(basis.set=my.basis.set,null.probs=out$probs)
+  list(basis.set=my.basis.set,null.probs=out$probs,
+       correlations.PoR=cor(PoR))
 }
 
 #' @export
@@ -656,6 +672,16 @@ summary.pwSEM.class<-function(object,structural.equations=FALSE,...){
   cat("\n")
   cat("C-statistic:",object$C.statistic,", df =",2*n,
       ", null probability:",object$prob.C.statistic,fill=T,"\n")
+  cat("Brown correction to null probability for correlated tests:",
+      object$Brown.correction.p,fill=T,"\n")
+  if(object$prob.C.statistic!=object$Brown.correction.p){
+    cat("Correlations between the tests of independence","\n")
+    rownames(object$R.correlated.tests)<-as.character(1:n)
+    colnames(object$R.correlated.tests)<-as.character(1:n)
+    cat("(product of residuals):","\n")
+    print(round(object$R.correlated.tests,3))
+    cat("\n")
+  }
   cat("AIC statistic:",object$AIC,fill=T,"\n")
   #print out structural equations...
   if(structural.equations){
