@@ -21,7 +21,7 @@ pwSEM.class<-function(x){
   structure(x,class="pwSEM.class")
 }
 
-#usethis::use_package("ggm")
+#use_package("ggm")
 #use_package("gamm4")
 #use_package("mgcv")
 #use_package("poolr")
@@ -203,10 +203,10 @@ pwSEM<-function(sem.functions,marginalized.latents=NULL,conditioned.latents=NULL
   #This is Brown's correction for correlated tests
   #out.dsep$correlations.PoR is the correlation matrix for the tests
     Brown.correction.p<-p.C.stat
-    mvnconv.R<-poolr::mvnconv(out.dsep$correlations.PoR)
     if(length(out.dsep$null.probs)>1){
-     Brown.correction.p<-poolr::fisher(out.dsep$null.probs,
-        R=mvnconv.R,adjust="generalized")$p
+     Brown.correction.p<-poolr::fisher(p=out.dsep$null.probs,
+        R=poolr::mvnconv(out.dsep$correlations.PoR),
+        adjust="generalized")$p
     }
   }
   else C.stat<-p.C.stat<-dsep.null.probs<-NULL
@@ -398,13 +398,13 @@ get.unbiased.sems<-function(sem.functions,mag,equivalent.mag,
     #dat2 holds the scaled values for the variables in the MAG plus
     #the other (grouping) variables
     dat2<-cbind(datA,datB)
+#    dimnames(dat2)<-dimnames(dat)
     for(i in 1:ncol){
       standardized.sem.functions[[i]]<-
         update.fun(sem.functions=sem.functions,i=i,all.grouping.vars =
           all.grouping.vars,add.terms="none",data=dat2)
     }
   }
-
   if(!is.normal | is.mixed)standardized.sem.functions<-NULL
 
   list(sem.functions=sem.functions,residuals=residual.values,
