@@ -70,7 +70,7 @@ pwSEM.class<-function(x){
 #'          mgcv::gam(X3~X2,data=sim_normal.no.nesting,family=gaussian),
 #'          mgcv::gam(X4~X3,data=sim_normal.no.nesting,family=gaussian))
 #' # RUN THE pwSEM FUNCTION WITH PERMUTATION PROBABILITIES AND INCLUDING THE DEPENDENT ERRORS
-#' out<-pwSEM(sem.functions=my.list,marginalized.latents=list(X4~~X2),
+#' out<-pwSEM(sem.functions=my.list, marginalized.latents=list(X4~~X2),
 #'           data=sim_normal.no.nesting,use.permutations = TRUE)
 #' summary(out,structural.equations=TRUE)
 #'
@@ -176,6 +176,7 @@ pwSEM<-function(sem.functions,marginalized.latents=NULL,conditioned.latents=NULL
     mag<-add.marginalized.latents(DAG=dag,marginalized.latents=marginalized.latents)
     no.latents<-FALSE
   }
+  if(is.null(marginalized.latents) & !is.null(conditioned.latents))mag<-dag
   if(is.null(conditioned.latents))temp<-NULL
   if(!is.null(conditioned.latents)){
     temp<-add.conditioned.latents(DAG=mag,marginalized.latents=marginalized.latents,
@@ -186,10 +187,13 @@ pwSEM<-function(sem.functions,marginalized.latents=NULL,conditioned.latents=NULL
   x2<-MAG.to.DAG.in.pwSEM(mag)
   #This gets the names of the latent variables that have been
   #added in the extended DAG (x2) to represent the free covariances
-  latents<-extract.latents(dag.with.latents=x2,not.latent.vars=not.latent.vars)
-  #This gets the d-separation equivalent DAG for this MAG
-  equivalent.mag<-DAG.to.MAG.in.pwSEM(full.DAG=x2,latents=latents,
-                  conditioning.latents=temp$conditioned.latents.latents)
+  latents<-extract.latents(dag.with.latents=x2,
+                           not.latent.vars=not.latent.vars)
+  #This gets the m-separation equivalent MAG for this DAG
+  if(!is.null(marginalized.latents) | !is.null(conditioned.latents)){
+    equivalent.mag<-DAG.to.MAG.in.pwSEM(full.DAG=x2,latents=latents,
+                  conditioning.latents=temp$conditioned.latents)
+  }
   basis.set<-basiSet.MAG(equivalent.mag)
   #  basis.set<-basiSet(equivalent.dag)
   if(!is.null(basis.set)){
@@ -414,7 +418,7 @@ get.unbiased.sems<-function(sem.functions,mag,equivalent.mag,
     excluded.terms=hold.excluded.terms,residual.values=
     residual.values)
 }
-
+#' @export
 update.fun<-function(sem.functions,i,all.grouping.vars,add.terms,data){
   #This function updates a gamm4 or gam model by adding the terms in "add.terms"
   #to the model formula and returning the fitted model
@@ -660,7 +664,7 @@ summary.pwSEM.class<-function(object,structural.equations=FALSE,...){
   if(object$use.permutations){
     cat("Null probabilities are based on permutation method",fill=T)
     cat("with",object$n.perms,"random permutations",fill=T)
-    cat("number of observations in data set:",object$n.data.lines,fill=T,"\n")
+    cat("Number of observations in data set:",object$n.data.lines,fill=T,"\n")
   }
   if(!object$use.permutations & object$n.data.lines<100)
     cat("Given small sample size, you should specify use.permutations=T",fill=T)
@@ -668,6 +672,9 @@ summary.pwSEM.class<-function(object,structural.equations=FALSE,...){
   for(i in 1:n){
     cat("(",n2[i],") ",object$dsep.probs[i],
         sep="",fill=T)
+  }
+  if(!object$use.permutations){
+    cat("Number of observations in data set:",object$n.data.lines,fill=T,"\n")
   }
   cat("\n")
   cat("C-statistic:",object$C.statistic,", df =",2*n,
@@ -848,7 +855,7 @@ add.conditioned.latents<-function(DAG,marginalized.latents,conditioned.latents){
   #conditioned.latents is a list  in the
   #form of formulae: x~~y
   #returns the MAG and the latent variable names
-  if(is.null(conditioned.latents))return(list(MAG=DAG,conditioned.latents.latents=NULL))
+  if(is.null(conditioned.latents))return(list(MAG=DAG,conditioned.latents=NULL))
   n.free<-length(marginalized.latents)
   if(is.null(marginalized.latents))n.free<-0
   n.conditioned.latents<-length(conditioned.latents)
@@ -867,7 +874,7 @@ add.conditioned.latents<-function(DAG,marginalized.latents,conditioned.latents){
     y.index<-var.nums[full.names==y]
     MAG[x.index,y.index]<-MAG[y.index,x.index]<-10
   }
-  return(list(MAG=MAG,conditioned.latents.latents=latent.names))
+  return(list(MAG=MAG,conditioned.latents=latent.names))
 }
 
 MAG.to.DAG.in.pwSEM<-function(x){
@@ -878,19 +885,18 @@ MAG.to.DAG.in.pwSEM<-function(x){
   #the pairs that are implicitly conditioned (X--Y)
 
   index.M = which(x==100,arr.ind=T)
-  n.M <- nrow(index.M)/2 # pairs with marginalized latents
+  n.M <- nrow(index.M)/2 # number of pairs with marginalized latents
   index.C<-which(x==10,arr.ind=T)
-  n.C<-nrow(index.C)/2 # pairs with conditioned latents
+  n.C<-nrow(index.C)/2 # number of pairs with conditioned latents
   #if there are no marginalized or conditioned latents, return
   if(n.M==0 & n.C==0)return(x)
+
   # new DAG including latent variables
-  #set elements inrows and columns of latents to zero to start
+  #set elements in rows and columns of latents to zero to start
   new.DAG <- matrix(0,ncol=ncol(x)+n.M+n.C,nrow=nrow(x)+n.M+n.C)
   #copy the original MAG into the observed vars in new.DAG
   new.DAG[1:ncol(x),1:nrow(x)]<-x
   # add names to matrix
-  #colnames(new.DAG) <- c(colnames(x),paste("L",1:n,sep=""))
-
   colnames(new.DAG) <- c(colnames(x),paste("L",1:(n.M+n.C),sep=""))
   rownames(new.DAG) <- c(colnames(x),paste("L",1:(n.M+n.C),sep=""))
   if(n.M>0){
@@ -921,7 +927,7 @@ MAG.to.DAG.in.pwSEM<-function(x){
   # matrix row number that has the
   #second pair of the dependent error
   # replace dependent error by directed path from Latent
-  #  no = 1
+  no <- n.M+1
   if(n.C>0){
     for (i in 1:n.C){
       new.DAG[index.C[i,1],ncol(x)+no] <- 1
@@ -1105,7 +1111,7 @@ DAG.to.MAG.in.pwSEM<-function (full.DAG, latents = NA,
     for(i in 1:n.latents){
       ok<-F
       for(j in 1:length(full.vars))if(latents[i]==full.vars[j])ok<-T
-      if(!ok)stop("ERROR: latent variable name not in the DAG")
+      if(!ok)stop("ERROR: latent variable name not in the full DAG")
     }
   }
   observed.vars<-observed.vars[!is.na(observed.vars)]

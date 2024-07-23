@@ -70,7 +70,7 @@ my.list<-list(mgcv::gam(X1~1,data=sim_normal.no.nesting,family=gaussian),
          mgcv::gam(X3~X2,data=sim_normal.no.nesting,family=gaussian),
          mgcv::gam(X4~X3,data=sim_normal.no.nesting,family=gaussian))
 # RUN THE pwSEM FUNCTION WITH PERMUTATION PROBABILITIES AND INCLUDING THE DEPENDENT ERRORS
-out<-pwSEM(sem.functions=my.list,marginalized.latents=list(X4~~X2),
+out<-pwSEM(sem.functions=my.list, marginalized.latents=list(X4~~X2),
           data=sim_normal.no.nesting,use.permutations = TRUE)
 summary(out,structural.equations=TRUE)
 
