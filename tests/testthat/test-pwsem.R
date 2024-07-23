@@ -1,4 +1,4 @@
-test()# THIS IS  CODE to create the documentation for the two data
+# THIS IS  CODE to create the documentation for the two data
 # sets to be distributed with the package
 #
 #' @format ## 'sim_data'
