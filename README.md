@@ -12,6 +12,9 @@ library(devtools)
 
 # install pwSEM from Bill's GitHub
 install_github("BillShipley/pwSEM")
+or
+library(pak)
+pak::pkg_install("BillShipley/pwSEM")
 
 library(pwSEM)
 
