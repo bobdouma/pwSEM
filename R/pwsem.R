@@ -239,9 +239,9 @@ pwSEM<-function(sem.functions,marginalized.latents=NULL,conditioned.latents=NULL
           residual.spearman.matrix=new.sems$spearman.matrix,
           sem.modified=new.sems$sem.modified,standardized.sem=
           new.sems$standardized.sem.functions,excluded.terms=
-            new.sems$excluded.terms,marginalized.latents=
-            marginalized.latents,response.residuals=
-            new.sems$residual.values)
+          new.sems$excluded.terms,marginalized.latents=
+          marginalized.latents,conditioned.latents=conditioned.latents,
+          response.residuals=new.sems$residual.values)
 #The AIC statistic is based on the sems of the equivalent mag
     class(x)<-"pwSEM.class"
   x<-pwSEM.class(x)
@@ -767,10 +767,10 @@ summary.pwSEM.class<-function(object,structural.equations=FALSE,...){
     }
     #finished for(i in 1:nfuns) loop...
     cat("\n")
-    n.free<-length(object$marginalized.latents)
-    if(n.free>0){
-      for(ij in 1:n.free){
-        cat("          _________ Dependent Errors _________________","\n")
+    n.marginalized<-length(object$marginalized.latents)
+    if(n.marginalized>0){
+      for(ij in 1:n.marginalized){
+        cat("  _______ Dependent errors from marginalized latents ______","\n")
         dep.var.names<-colnames(object$residual.pearson.matrix)
         var.numbers<-1:length(var.names)
         print(object$marginalized.latents[ij])
@@ -791,6 +791,30 @@ summary.pwSEM.class<-function(object,structural.equations=FALSE,...){
       }
     }
 
+    cat("\n")
+    n.conditioned<-length(object$conditioned.latents)
+    if(n.conditioned>0){
+      for(ij in 1:n.conditioned){
+        cat("  _______ Dependent errors from conditioned latents ______","\n")
+        dep.var.names<-colnames(object$residual.pearson.matrix)
+        var.numbers<-1:length(var.names)
+        print(object$conditioned.latents[ij])
+        x<-as.character(object$conditioned.latents[[ij]][2])
+        y<-gsub("~","",as.character(object$conditioned.latents[[ij]][3]))
+        x.index<-var.nums[dep.var.names==x]
+        y.index<-var.nums[dep.var.names==y]
+        if(is.family.normal(object$sem.functions)){
+          cat("Pearson correlation: ",
+              round(object$residual.pearson.matrix[x.index,y.index],4),"\n")
+          cat("Covariance: ",
+              round(object$residual.cov.matrix[x.index,y.index],4),"\n")
+        }
+        if(!is.family.normal(object$sem.functions)){
+          cat("Spearman correlation: ",
+              round(object$residual.spearman.matrix[x.index,y.index],4),"\n")
+        }
+      }
+    }
   }
 }
 
