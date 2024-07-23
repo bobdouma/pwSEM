@@ -16,6 +16,7 @@ install_github("BillShipley/pwSEM")
 or
 
 library(pak)
+
 pak::pkg_install("BillShipley/pwSEM")
 
 library(pwSEM)
