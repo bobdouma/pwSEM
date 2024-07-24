@@ -1109,6 +1109,24 @@ function(use.dag,start.var,end.var){
   return(test1 & test2)
 }
 
+#' Title DAG.to.MAG.in.pwSEM
+#'
+#' @param full.DAG The DAG with latent variables, usually produced with the
+#' DAG() function of the ggm package
+#' @param latents A character vector giving the names of the latent variables
+#' in the DAG
+#' @param conditioning.latents A character vector giving the names
+#' of those latents, listed in the "latents" argument, that serve as
+#' conditioning variables for sampling (i.e. selection bias).
+#'
+#' @return A matrix holding the MAG
+#' @export
+#'
+#' @examples
+#' library(ggm)
+#' full.dag<-DAG(x1~L1,x2~x1,x3~x2+L1,x4~x3,L2~x2+x4)
+#' DAG.to.MAG.in.pwSEM(full.DAG=full.dag,latents=c("L1","L2"),
+#' conditioning.latents=c("L2"))
 DAG.to.MAG.in.pwSEM<-function (full.DAG, latents = NA,
                                conditioning.latents=NULL)
 {
