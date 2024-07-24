@@ -901,6 +901,23 @@ add.conditioned.latents<-function(DAG,marginalized.latents,conditioned.latents){
   return(list(MAG=MAG,conditioned.latents=latent.names))
 }
 
+#' MAG.to.DAG.in.pwSEM
+#' @description This function converts a MAG, usually created with the makeMG()
+#' function of th ggm library, with  0/1 for the directed paths,
+#' 100 for marginalized latents and 10 for conditioned latents.
+#'
+#' @param x a MAG input as a matrix
+#'
+#' @return A binary matrix of 0/1 values representing the DAG produced
+#' by adding the latent variables (shown as L1, L2 etc)
+#'
+#' @export
+#'
+#' @examples
+#' library(ggm)
+#' my.mag<-makeMG(dg=DAG(X2~X1,X3~X2,X4~X3),bg=UG(~X2*X4))
+#' DAG.with.latent<-MAG.to.DAG.in.pwSEM(my.mag)
+#'
 MAG.to.DAG.in.pwSEM<-function(x){
   #returns a DAG with latents from a MAG without latents
   #index.M returns a matrix giving the row and column numbers for
@@ -1599,7 +1616,7 @@ extract.variable.info.from.gam<-function(fo){
   list(var.name=var.name,family=family,grouping.structure=grouping.structure)
 }
 
-#' Title  view.paths
+#' view.paths
 #'
 #'This is a function, usually called after pwSEM, to allow you to visually
 #'see how two variables in the DAG relate to each other along all directed paths

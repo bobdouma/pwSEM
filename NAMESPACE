@@ -3,6 +3,7 @@
 S3method(pairs,without.edge.in.pwSEM)
 S3method(summary,pwSEM.class)
 S3method(update,fun)
+export(MAG.to.DAG.in.pwSEM)
 export(basiSet.MAG)
 export(generalized.covariance)
 export(perm.generalized.covariance)

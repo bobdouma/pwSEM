@@ -2,7 +2,7 @@
 % Please edit documentation in R/pwsem.R
 \name{view.paths}
 \alias{view.paths}
-\title{Title  view.paths}
+\title{view.paths}
 \usage{
 view.paths(
   from,
