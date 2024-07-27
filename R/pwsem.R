@@ -1636,7 +1636,7 @@ extract.variable.info.from.gam<-function(fo){
 
 #' view.paths
 #'
-#'This is a function, usually called after pwSEM, to allow you to visually
+#' @description This is a function, usually called after pwSEM, to allow you to visually
 #'see how two variables in the DAG relate to each other along all directed paths
 #'from one to the other and to see how the 1st derivative of this relationship
 #'changes as the "from" variable changes.  For linear relationships, this is a
@@ -1830,4 +1830,69 @@ view.paths<-function(from,to,sem.functions,data,minimum.x=NULL,
     }
     if(return.values)get.der
   }
+}
+#' Title Monte Carlo chi-square (MCX2)
+#'
+#' @description The maximum likelihood chi-square statistic that
+#' is commonly calculated in structural equations modelling only
+#' asymptotically follows a theoretical chi-squared distribution;
+#' with small sample sizes it can deviate enough from the theoretical
+#' distribution to make it problematic.This function estimates the
+#' empirical probability distribution of the Maximum Likelihood
+#' Chi-Square statistic, given a fixed sample size and degrees of
+#' freedom, and outputs the estimated null probability given this
+#' sample size and degrees of freedom.
+#' @param model.df the model degrees of freedom
+#' @param n.obs the number of observations (lines) in the data set
+#' @param model.chi.square the maximum likelihood chi-squared statistic
+#' @param n.sim the number of independent simulation runs
+#' @param plot.result a graphical output of the result
+#'
+#' @return MCprobability (Monte carlo null probability),
+#' MLprobability (maximum likelihood probability)
+#'
+#' @importFrom graphics hist legend lines
+#' @importFrom stats rnorm var dchisq pchisq
+#'
+#' @export
+#'
+#' @examples
+#' MCX2(model.df=10,n.obs=15,model.chi.square=18.2,plot.result=TRUE)
+MCX2<-function (model.df, n.obs, model.chi.square, n.sim = 10000,
+                plot.result=FALSE)
+{
+  x <- (-1 + sqrt(1 + 8 * model.df))/2
+  if ((x - as.integer(x)) == 0)
+    v <- x
+  if ((x - as.integer(x)) > 0 & (x - as.integer(x)) < 1)
+    v <- as.integer(x) + 1
+  if ((x - as.integer(x)) > 1)
+    return("error")
+  c.value <- v * (v + 1)/2 - model.df
+  MCX2 <- rep(NA, n.sim)
+  for (i in 1:n.sim) {
+    dat <- matrix(rnorm(n.obs * v), ncol = v)
+    obs.VCV <- var(dat)
+    model.VCV <- diag(v)
+    diag(model.VCV)[1:c.value] <- diag(obs.VCV)[1:c.value]
+    MCX2[i] <- (n.obs - 1) * (log(det(model.VCV)) + sum(diag(obs.VCV) *
+                                                          (1/diag(model.VCV))) - log(det(obs.VCV)) - v)
+  }
+  prob <- sum(MCX2 >= model.chi.square)/n.sim
+  x <- seq(0, max(MCX2))
+  theoretical.prob <- dchisq(x, model.df)
+  if(plot.result){
+   hist(MCX2, freq = F, ylab = "proportion of simulations",
+       xlab = "Maximum likelihood chi-square statistic", main = "Monte Carlo simulations",
+       ylim = c(0, max(theoretical.prob)), sub = paste(as.character(model.df),
+                                                       " df"))
+    lines(x, theoretical.prob, lty = 2)
+    lines(x = c(model.chi.square, model.chi.square), y = c(0,
+                                                         1), lwd = 2)
+    legend(x = "topright", legend = "theoretical X2 distribution",
+         lty = 2)
+
+  }
+  list(MCprobability = prob, MLprobability = 1 - pchisq(model.chi.square,
+                                                        model.df))
 }
