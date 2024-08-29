@@ -625,6 +625,14 @@ summary.pwSEM.class<-function(object,structural.equations=FALSE,...){
   var.names<-row.names(object$causal.graph)
   n.vars<-dim(object$causal.graph)[1]
   var.nums<-1:n.vars
+#tests if the m-equivalent MAG has correlated errors.
+  correlated.errors<-FALSE
+  for(i in 1:n.vars){
+    if(any(object$dsep.equivalent.causal.graph[i,]==100)){
+      correlated.errors<-TRUE
+      break
+    }
+  }
   for(i in 1:(n.vars-1)){
     for(j in (i+1):n.vars){
       if(object$causal.graph[i,j]==1)
@@ -679,16 +687,19 @@ summary.pwSEM.class<-function(object,structural.equations=FALSE,...){
   cat("\n")
   cat("C-statistic:",object$C.statistic,", df =",2*n,
       ", null probability:",object$prob.C.statistic,fill=T,"\n")
-  cat("Brown correction to null probability for correlated tests:",
+  if(correlated.errors){
+     cat("Brown correction to null probability for correlated tests:",
       object$Brown.correction.p,fill=T,"\n")
-  if(object$prob.C.statistic!=object$Brown.correction.p){
-    cat("Correlations between the tests of independence","\n")
-    rownames(object$R.correlated.tests)<-as.character(1:n)
-    colnames(object$R.correlated.tests)<-as.character(1:n)
-    cat("(product of residuals):","\n")
-    print(round(object$R.correlated.tests,3))
-    cat("\n")
+    if(object$prob.C.statistic!=object$Brown.correction.p){
+      cat("Correlations between the tests of independence","\n")
+      rownames(object$R.correlated.tests)<-as.character(1:n)
+      colnames(object$R.correlated.tests)<-as.character(1:n)
+      cat("(product of residuals):","\n")
+      print(round(object$R.correlated.tests,3))
+      cat("\n")
+    }
   }
+
   cat("AIC statistic:",object$AIC,fill=T,"\n")
   #print out structural equations...
   if(structural.equations){
@@ -1318,6 +1329,7 @@ strip.formula<-function(fo){
 }
 
 get.AIC<-function(sem.functions){
+  #To be used only for DAGs, not MAGs
   #calculates the AIC statistic for the set of sem.functions
   #based on Shipley, B. & Douma, J.C. 2020. Generalized AIC
   #and chi-squared statistics for path models consistent with
