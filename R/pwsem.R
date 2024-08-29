@@ -25,6 +25,7 @@ pwSEM.class<-function(x){
 #use_package("gamm4")
 #use_package("mgcv")
 #use_package("poolr")
+#use_package("mvtnorm")
 
 #This is the code to create the documentation for the function
 #' @title The pwSEM function
@@ -225,14 +226,20 @@ pwSEM<-function(sem.functions,marginalized.latents=NULL,conditioned.latents=NULL
       equivalent.mag=equivalent.mag,dat=data,
       all.grouping.vars=all.grouping.vars)
 #  sem.functions<-new.sems$sem.functions
-
+  AIC.out<-AIC.MAG(sem.model=new.sems$sem.functions,
+                          MAG=equivalent.mag,data=data)
   x<-list(causal.graph=mag,dsep.equivalent.causal.graph=equivalent.mag,basis.set=basis.set,
           dsep.probs=dsep.null.probs,
           sem.functions=new.sems$sem.functions,
           C.statistic=C.stat,prob.C.statistic=p.C.stat,
           Brown.correction.p=Brown.correction.p,
           R.correlated.tests=out.dsep$correlations.PoR,
-          AIC=get.AIC(new.sems$sem.functions),n.data.lines=n.data.lines,
+#          AIC=get.AIC(new.sems$sem.functions),
+          AIC=AIC.out$AIC,
+          AIC.c=AIC.out$AIC.c,
+          LL=AIC.out$LL,
+          free.parameters=AIC.out$free.parameters,
+          n.data.lines=n.data.lines,
           use.permutations=use.permutations,n.perms=n.perms,
           residual.cov.matrix=new.sems$covariance.matrix,
           residual.pearson.matrix=new.sems$pearson.matrix,
@@ -685,7 +692,7 @@ summary.pwSEM.class<-function(object,structural.equations=FALSE,...){
     cat("Number of observations in data set:",object$n.data.lines,fill=T,"\n")
   }
   cat("\n")
-  cat("C-statistic:",object$C.statistic,", df =",2*n,
+  cat("C-statistic:",object$AIC,", df =",2*n,
       ", null probability:",object$prob.C.statistic,fill=T,"\n")
   if(correlated.errors){
      cat("Brown correction to null probability for correlated tests:",
@@ -701,6 +708,9 @@ summary.pwSEM.class<-function(object,structural.equations=FALSE,...){
   }
 
   cat("AIC statistic:",object$AIC,fill=T,"\n")
+  cat("Bias-corrected AIC statistic:",object$AIC.c,fill=T,"\n")
+  cat("log-likelihood:",object$LL,fill=T,"\n")
+  cat("Number of free parameters:",object$free.parameters,fill=T,"\n")
   #print out structural equations...
   if(structural.equations){
     n.funs<-length(object$sem.functions)
@@ -1348,6 +1358,105 @@ get.AIC<-function(sem.functions){
       }
   }
   sum(AIC.vector)
+}
+
+correlated.var.LL<-function(f1,f2){
+  #Needs dmvnorm function of library(mvtnorm)
+  #
+  #f1 is the model for X1 & f2 is the model for X2
+  #This function gives the log-likelihood values and K given a bivariate normal
+  r1<-residuals(f1,type="deviance")
+
+  if(inherits(f1,"gam")){
+    K1 <- attr(stats::logLik(f1), "df")
+  }
+  else
+    if(inherits(f1,"lmerMod") |
+       inherits(f1,"gamm") |
+       inherits(f1,"glmerMod")){
+      K1 <- attr(stats::logLik(f1), "df")
+    }
+
+  r2<-residuals(f2,type="deviance")
+
+  if(inherits(f2,"gam")){
+    K2 <- attr(stats::logLik(f2), "df")
+  }
+  else
+    if(inherits(f2,"lmerMod") |
+       inherits(f2,"gamm") |
+       inherits(f2,"glmerMod")){
+      K2 <- attr(stats::logLik(f2), "df")
+    }
+
+  points<-cbind(r1,r2)
+  mean.vector<-cbind(0,0)
+  #must estimate the covariance
+  #the residual variances are already estimated in the regressions
+  vcv<-var(points)
+  density.values <- mvtnorm::dmvnorm(points, mean = mean.vector, sigma = vcv)
+  data.frame(LL=sum(log(density.values)),K=K1+K2+1)
+}
+
+AIC.MAG<-function(sem.model,MAG,data){
+  # This function calculates the AIC statistics for mixed acyclic graphs (MAGs)
+  #  sem.model is a list containing the structural equations of the m-equivalent
+  #  MAG
+  # MAG is the matrix giving the MAG
+
+  #MAKE SURE THE ORDER OF VARIABLES IN THE MAG AGREES WITH THOSE IN sem.model!
+  var.names<-colnames((MAG))
+  N.models<-length(sem.model)
+  sample.N<-dim(data)[1]
+  LL.K<-data.frame(LL=rep(NA,N.models),K=rep(NA,N.models))
+  for(i in 1:N.models){
+    #LL is not NA so this variable has already been done
+    if(!is.na(LL.K$LL[i]))next
+    #This variable has no correlated errors
+    if(!any(MAG[i,]==100)){
+
+      if(inherits(sem.model[i][[1]],"gam")){
+        f1<-sem.model[i][[1]]
+        x<-stats::logLik(f1)
+      }
+      else
+        if(inherits(sem.model[i][[1]]$mer,"lmerMod") |
+           inherits(sem.model[i][[1]],"gamm") |
+           inherits(sem.model[i][[1]]$mer,"glmerMod")){
+          f1<-sem.model[i][[1]]$mer
+          x<-stats::logLik(f1)
+        }
+      LL.K[i,1]<-x
+      LL.K[i,2]<-attr(x,which="df")
+    }
+    #This variable has correlated errors and it hasn't yet been done
+    if(any(MAG[i,]==100)){
+      #This is the index of the other variable in the pair of correlated errors
+      other.var<-(1:N.models)[MAG[i,]==100]
+
+      if(inherits(sem.model[other.var][[1]],"gam")){
+        f1<-sem.model[other.var][[1]]
+      }
+      else
+        if(inherits(sem.model[other.var][[1]]$mer,"lmerMod") |
+           inherits(sem.model[other.var][[1]],"gamm") |
+           inherits(sem.model[other.var][[1]]$mer,"glmerMod")){
+          f2<-sem.model[other.var][[1]]$mer
+        }
+
+      # this is bivariate LL assuming normal distribution
+      out<-correlated.var.LL(f1,f2)
+      LL.K[i,1]<-out$LL
+      LL.K[other.var,1]<-0
+      LL.K[i,2]<-out$K
+      LL.K[other.var,2]<-0
+    }
+  }
+  AIC<- -2*sum(LL.K$LL)+2*sum(LL.K$K)
+  AIC.c<- -2*sum(LL.K$LL)+2*sum(LL.K$K)*(sample.N/(sample.N-sum(LL.K$K-1)))
+  logL<-sum(LL.K[,1])
+  K<-sum(LL.K[,2])
+  data.frame(AIC=AIC,AIC.c=AIC.c,LL=logL,free.parameters=K)
 }
 
 get.residuals<-function(my.list,dsep,data,do.smooth,
