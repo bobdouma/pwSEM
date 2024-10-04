@@ -226,7 +226,7 @@ pwSEM<-function(sem.functions,marginalized.latents=NULL,conditioned.latents=NULL
       equivalent.mag=equivalent.mag,dat=data,
       all.grouping.vars=all.grouping.vars)
 #  sem.functions<-new.sems$sem.functions
-  AIC.out<-AIC.MAG(sem.model=new.sems$sem.functions,
+  AIC.out<-get.AIC(sem.model=new.sems$sem.functions,
                           MAG=equivalent.mag,data=data)
   x<-list(causal.graph=mag,dsep.equivalent.causal.graph=equivalent.mag,basis.set=basis.set,
           dsep.probs=dsep.null.probs,
@@ -234,11 +234,10 @@ pwSEM<-function(sem.functions,marginalized.latents=NULL,conditioned.latents=NULL
           C.statistic=C.stat,prob.C.statistic=p.C.stat,
           Brown.correction.p=Brown.correction.p,
           R.correlated.tests=out.dsep$correlations.PoR,
-#          AIC=get.AIC(new.sems$sem.functions),
           AIC=AIC.out$AIC,
-          AIC.c=AIC.out$AIC.c,
+          AIC.c=AIC.out$AICc,
           LL=AIC.out$LL,
-          free.parameters=AIC.out$free.parameters,
+          free.parameters=AIC.out$.K,
           n.data.lines=n.data.lines,
           use.permutations=use.permutations,n.perms=n.perms,
           residual.cov.matrix=new.sems$covariance.matrix,
@@ -692,7 +691,7 @@ summary.pwSEM.class<-function(object,structural.equations=FALSE,...){
     cat("Number of observations in data set:",object$n.data.lines,fill=T,"\n")
   }
   cat("\n")
-  cat("C-statistic:",object$AIC,", df =",2*n,
+  cat("C-statistic:",object$C.stat,", df =",2*n,
       ", null probability:",object$prob.C.statistic,fill=T,"\n")
   if(correlated.errors){
      cat("Brown correction to null probability for correlated tests:",
@@ -707,7 +706,7 @@ summary.pwSEM.class<-function(object,structural.equations=FALSE,...){
     }
   }
 
-  cat("AIC statistic:",object$AIC,fill=T,"\n")
+  if(!is.na(object.AIC))cat("AIC statistic:",object$AIC,fill=T,"\n")
   cat("Bias-corrected AIC statistic:",object$AIC.c,fill=T,"\n")
   cat("log-likelihood:",object$LL,fill=T,"\n")
   cat("Number of free parameters:",object$free.parameters,fill=T,"\n")
@@ -1338,126 +1337,205 @@ strip.formula<-function(fo){
   stats::formula(paste(dep,"~",temp.ind))
 }
 
-get.AIC<-function(sem.functions){
-  #To be used only for DAGs, not MAGs
-  #calculates the AIC statistic for the set of sem.functions
-  #based on Shipley, B. & Douma, J.C. 2020. Generalized AIC
-  #and chi-squared statistics for path models consistent with
-  #directed acyclic graphs.  Ecology 101(3):e02960.
-  n.functions<-length(sem.functions)
-  AIC.vector<-rep(NA,n.functions)
-  for(i in 1:n.functions){
-    if(inherits(sem.functions[i][[1]],"gam")){
-      AIC.vector[i]<-stats::AIC(sem.functions[i][[1]])
+prob.distribution.for.copula<-function(fun,data){
+  #This function produces a vector (prob) holding the probabilities of the
+  #observations, which are used in the fitCopula() function
+  #If the distributional family is not one that is supported by this function
+  #then it returns a vector of NA
+
+  if(inherits(fun,"gam")){
+    fam<-fun$family
+  }
+  else
+    if(inherits(sem.model[i][[1]]$mer,"lmerMod") |
+       inherits(sem.model[i][[1]],"gamm") |
+       inherits(sem.model[i][[1]]$mer,"glmerMod")){
+      fam<-fun$gam$family
+    }
+
+  if(fam$family=="gaussian"){
+    #response scale by default
+    prob<-stats::pnorm(q=fun$y,mean=predict(fun),sd=sqrt(summary(fun)$scale))
+    return(prob)
+  }
+  else
+    if(fam$family=="poisson"){
+      prob<-stats::ppois(q=fun$y,lambda=predict(fun,type="response"))
+      return(prob)
+    }
+  else
+
+    if(fam$family=="binomial"){
+      #the input vector (Y) is not 0/1
+      if(any(fun$weights!=1)){
+        print("Binomial model with weights different from 1 not supported")
+        stop
+      }
+      prob<-stats::pbinom(q=fun$y,size=1,prob=predict(fun,type="response"))
+      return(prob)
+    }
+  else
+    x<-fun$family
+  x<-substr(x,start=1,stop=17)
+  if(x[1]=="Negative Binomial"){
+    #THIS IS WRONG
+    prob<-stats::pnbinom(q=fun$y,size=fun$family$getTheta(),prob=predict(fun,type="link"))
+    return(prob)
+  }
+  else {
+    print(cat("The AIC function does not support the family:",fam$family))
+    #The family isn't supported here, so return NAs
+    prob<-rep(NA,length(predict(fun)))
+    return(prob)
+  }
+}
+
+get.AIC<-function(sem.model,MAG,data){
+  #This function calculate the log likelihood, K, AIC and AICc statistics
+  #for both DAGs and MAGs (using gaussian copulas)
+  N<-length(sem.model)
+  LL.subDAG<-K.subDAG<-rep(NA,N)
+  #get the log likelihoods for the directed edges (->)
+  for(i in 1:N){
+    if(inherits(sem.model[[i]],"gam")){
+      LL.subDAG[i]<-stats::logLik(sem.model[[i]])
+      K.subDAG[i]<-attr(stats::logLik(sem.model[[i]]),which="df")
     }
     else
-      if(inherits(sem.functions[i][[1]]$mer,"lmerMod") |
-         inherits(sem.functions[i][[1]],"gamm") |
-         inherits(sem.functions[i][[1]]$mer,"glmerMod")){
-        AIC.vector[i]<-stats::AIC(sem.functions[i][[1]]$mer)
+      if(inherits(sem.model[i][[1]]$mer,"lmerMod") |
+         inherits(sem.model[i][[1]],"gamm") |
+         inherits(sem.model[i][[1]]$mer,"glmerMod")){
+
+        LL.subDAG[i]<-stats::logLik(sem.model[[i]]$mer)
+        K.subDAG[i]<-attr(stats::logLik(sem.model[[i]]$mer),which="df")
       }
   }
-  sum(AIC.vector)
+  LL.copulas<-
+    get.LL.of.districts(sem.model=sem.model,MAG=MAG,data=data)
+  total.LL<-sum(LL.subDAG)+sum(LL.copulas$LL)
+  total.K<-sum(K.subDAG)+sum(LL.copulas$K)
+  AIC<--2*total.LL+2*total.K
+  N.obs<-dim(data)[1]
+  AICc<-AIC+2*total.K*(total.K+1)/(N.obs-total.K-1)
+  out<-data.frame(LL=total.LL,
+                  K=total.K,AIC=AIC,AICc=AICc)
+  return(out)
 }
 
-correlated.var.LL<-function(f1,f2){
-  #Needs dmvnorm function of library(mvtnorm)
-  #
-  #f1 is the model for X1 & f2 is the model for X2
-  #This function gives the log-likelihood values and K given a bivariate normal
-  r1<-residuals(f1,type="deviance")
-
-  if(inherits(f1,"gam")){
-    K1 <- attr(stats::logLik(f1), "df")
-  }
-  else
-    if(inherits(f1,"lmerMod") |
-       inherits(f1,"gamm") |
-       inherits(f1,"glmerMod")){
-      K1 <- attr(stats::logLik(f1), "df")
+reorder.MAG<-function(MAG,dep.var.names){
+  #Reorders the rows of MAG to agree with the order of the dependent
+  #variables listed in dep.var.names
+  new.MAG<-MAG
+  N<-dim(MAG)[1]
+  for(i in 1:N){
+    for(j in 1:N){
+      new.MAG[i,j]<-
+        MAG[dep.var.names[i]==rownames(MAG),dep.var.names[j]==rownames(MAG)]
     }
-
-  r2<-residuals(f2,type="deviance")
-
-  if(inherits(f2,"gam")){
-    K2 <- attr(stats::logLik(f2), "df")
   }
-  else
-    if(inherits(f2,"lmerMod") |
-       inherits(f2,"gamm") |
-       inherits(f2,"glmerMod")){
-      K2 <- attr(stats::logLik(f2), "df")
-    }
-
-  points<-cbind(r1,r2)
-  mean.vector<-cbind(0,0)
-  #must estimate the covariance
-  #the residual variances are already estimated in the regressions
-  vcv<-var(points)
-  density.values <- mvtnorm::dmvnorm(points, mean = mean.vector, sigma = vcv)
-  data.frame(LL=sum(log(density.values)),K=K1+K2+1)
+  dimnames(new.MAG)<-list(dep.var.names,dep.var.names)
+  new.MAG
 }
 
-AIC.MAG<-function(sem.model,MAG,data){
-  # This function calculates the AIC statistics for mixed acyclic graphs (MAGs)
+cor.structure.of.district<-function(MAG,vars.in.district){
+  #determines which elements of the correlation matrix of a district
+  #will be fixed at zero based on the MAG
+  #MAG is the input MAG
+  #vars.in.district are the names of the variables in this district
+  N.vars.in.district<-length(vars.in.district)
+  N.in.cor.structure<-(N.vars.in.district)*(N.vars.in.district-1)/2
+  cor.structure<-rep(NA,N.in.cor.structure)
+  kount<-0
+  for(i in 1:(N.vars.in.district-1)){
+    for(j in (i+1):N.vars.in.district){
+      x<-MAG[colnames(MAG)==vars.in.district[i],
+             colnames(MAG)==vars.in.district[j]]
+      kount<-kount+1
+      if(x==0)cor.structure[kount]<-TRUE
+      if(x>1)cor.structure[kount]<-FALSE
+    }
+  }
+  return(cor.structure)
+}
+
+get.LL.of.districts<-function(sem.model,MAG,data){
   #  sem.model is a list containing the structural equations of the m-equivalent
   #  MAG
-  # MAG is the matrix giving the MAG
+  # MAG is the matrix giving the equivalent MAG
+  # uses ggm and copula libraries
 
-  #MAKE SURE THE ORDER OF VARIABLES IN THE MAG AGREES WITH THOSE IN sem.model!
-  var.names<-colnames((MAG))
   N.models<-length(sem.model)
-  sample.N<-dim(data)[1]
-  LL.K<-data.frame(LL=rep(NA,N.models),K=rep(NA,N.models))
+  dep.var.names<-rep("NA",N.models)
   for(i in 1:N.models){
-    #LL is not NA so this variable has already been done
-    if(!is.na(LL.K$LL[i]))next
-    #This variable has no correlated errors
-    if(!any(MAG[i,]==100)){
 
-      if(inherits(sem.model[i][[1]],"gam")){
-        f1<-sem.model[i][[1]]
-        x<-stats::logLik(f1)
-      }
-      else
-        if(inherits(sem.model[i][[1]]$mer,"lmerMod") |
-           inherits(sem.model[i][[1]],"gamm") |
-           inherits(sem.model[i][[1]]$mer,"glmerMod")){
-          f1<-sem.model[i][[1]]$mer
-          x<-stats::logLik(f1)
-        }
-      LL.K[i,1]<-x
-      LL.K[i,2]<-attr(x,which="df")
+    if(inherits(sem.model[[i]],"gam")){
+      dep.var.names[i]<-as.character(sem.model[i][[1]]$formula[2])
     }
-    #This variable has correlated errors and it hasn't yet been done
-    if(any(MAG[i,]==100)){
-      #This is the index of the other variable in the pair of correlated errors
-      other.var<-(1:N.models)[MAG[i,]==100]
+    else
+      if(inherits(sem.model[i][[1]]$mer,"lmerMod") |
+         inherits(sem.model[i][[1]],"gamm") |
+         inherits(sem.model[i][[1]]$mer,"glmerMod")){
+        dep.var.names[i]<-as.character(sem.model[i][[1]]$gam$formula[2])
 
-      if(inherits(sem.model[other.var][[1]],"gam")){
-        f1<-sem.model[other.var][[1]]
       }
-      else
-        if(inherits(sem.model[other.var][[1]]$mer,"lmerMod") |
-           inherits(sem.model[other.var][[1]],"gamm") |
-           inherits(sem.model[other.var][[1]]$mer,"glmerMod")){
-          f2<-sem.model[other.var][[1]]$mer
-        }
+  }
+  #MAKE SURE THE ORDER OF VARIABLES IN THE MAG AGREES WITH THOSE IN sem.model!
+  reordered.MAG<-reorder.MAG(MAG=MAG,dep.var.names=dep.var.names)
+  var.names<-colnames(reordered.MAG)
+  #MAG is the adjacency matrix produced by makeMG
+  new.graph<-reordered.MAG
+  new.graph[new.graph==1]<-0
+  #conComp returns the connectivity components of new.graph, which gives
+  #the district to which each variable belongs
+  districts<-ggm::conComp(new.graph)
+  n.districts<-max(districts)
+  #LL will hold the log likelihood values for districts containing more than
+  #one variable.
+  LL<-K<-rep(NA,n.districts)
+  for(i in 1:n.districts){
+    n.in.district<-length(districts[districts==i])
+    if(n.in.district>1){
+      vars.in.district<-colnames(new.graph)[districts==i]
+      # collect the transformed probabilities for this copula
+      mat<-matrix(NA,nrow=dim(data)[1],ncol=n.in.district)
+      colnames(mat)<-vars.in.district
+      n.in.mat<-0
+      for(j in 1:N.models){
+        if(districts[j]==i){
+          n.in.mat<-n.in.mat+1
 
-      # this is bivariate LL assuming normal distribution
-      out<-correlated.var.LL(f1,f2)
-      LL.K[i,1]<-out$LL
-      LL.K[other.var,1]<-0
-      LL.K[i,2]<-out$K
-      LL.K[other.var,2]<-0
+          if(inherits(sem.model[[j]],"gam")){
+            in.fun<-sem.model[[j]]
+          }
+          else
+            if(inherits(sem.model[j][[1]]$mer,"lmerMod") |
+               inherits(sem.model[j][[1]],"gamm") |
+               inherits(sem.model[j][[1]]$mer,"glmerMod")){
+              in.fun<-sem.model[[j]]$gam
+            }
+
+          mat[,n.in.mat]<-prob.distribution.for.copula(
+            fun=in.fun,data=data)
+        }
+      }
+      cor.mat<-stats::cor(mat)
+      ncop <- copula::normalCopula(param = cor.mat[upper.tri(cor.mat)],
+                                   dim = n.in.mat, dispstr = "un")
+      #This returns a logical vector stating if each element in the correlation
+      #matrix is free or fixed (at zero) during ML estimation
+      fixed.free<-cor.structure.of.district(MAG=reordered.MAG,
+                                            vars.in.district=vars.in.district)
+      #set correlation of each fixed element in the correlation matrix to 0
+      cor.mat[upper.tri(cor.mat)][fixed.free]<-0
+      copula::fixedParam(ncop) <- fixed.free
+      fitC <- fitCopula(copula=ncop,data=mat,method="ml")
+      LL[i]<-stats::logLik(fitC)
+      K[i]<-attr(stats::logLik(fitC),which="df")
     }
   }
-  AIC<- -2*sum(LL.K$LL)+2*sum(LL.K$K)
-  AIC.c<- -2*sum(LL.K$LL)+2*sum(LL.K$K)*(sample.N/(sample.N-sum(LL.K$K-1)))
-  logL<-sum(LL.K[,1])
-  K<-sum(LL.K[,2])
-  data.frame(AIC=AIC,AIC.c=AIC.c,LL=logL,free.parameters=K)
+  return(list(LL=sum(LL[!is.na(LL)]),K=sum(K[!is.na(K)])))
 }
+
 
 get.residuals<-function(my.list,dsep,data,do.smooth,
                         all.grouping.vars,observed.vars){
