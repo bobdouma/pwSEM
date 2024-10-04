@@ -235,9 +235,9 @@ pwSEM<-function(sem.functions,marginalized.latents=NULL,conditioned.latents=NULL
           Brown.correction.p=Brown.correction.p,
           R.correlated.tests=out.dsep$correlations.PoR,
           AIC=AIC.out$AIC,
-          AIC.c=AIC.out$AICc,
+          AICc=AIC.out$AICc,
           LL=AIC.out$LL,
-          free.parameters=AIC.out$.K,
+          free.parameters=AIC.out$K,
           n.data.lines=n.data.lines,
           use.permutations=use.permutations,n.perms=n.perms,
           residual.cov.matrix=new.sems$covariance.matrix,
@@ -706,8 +706,8 @@ summary.pwSEM.class<-function(object,structural.equations=FALSE,...){
     }
   }
 
-  if(!is.na(object.AIC))cat("AIC statistic:",object$AIC,fill=T,"\n")
-  cat("Bias-corrected AIC statistic:",object$AIC.c,fill=T,"\n")
+  cat("AIC statistic:",object$AIC,fill=T,"\n")
+  cat("Bias-corrected AIC statistic:",object$AICc,fill=T,"\n")
   cat("log-likelihood:",object$LL,fill=T,"\n")
   cat("Number of free parameters:",object$free.parameters,fill=T,"\n")
   #print out structural equations...
