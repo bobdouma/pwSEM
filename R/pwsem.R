@@ -25,7 +25,7 @@ pwSEM.class<-function(x){
 #use_package("gamm4")
 #use_package("mgcv")
 #use_package("poolr")
-#use_package("mvtnorm")
+#use_package("copula")
 
 #This is the code to create the documentation for the function
 #' @title The pwSEM function
@@ -1347,9 +1347,9 @@ prob.distribution.for.copula<-function(fun,data){
     fam<-fun$family
   }
   else
-    if(inherits(sem.model[i][[1]]$mer,"lmerMod") |
-       inherits(sem.model[i][[1]],"gamm") |
-       inherits(sem.model[i][[1]]$mer,"glmerMod")){
+    if(inherits(fun$mer,"lmerMod") |
+       inherits(fun,"gamm") |
+       inherits(fun$mer,"glmerMod")){
       fam<-fun$gam$family
     }
 
@@ -1378,8 +1378,8 @@ prob.distribution.for.copula<-function(fun,data){
     x<-fun$family
   x<-substr(x,start=1,stop=17)
   if(x[1]=="Negative Binomial"){
-    #THIS IS WRONG
-    prob<-stats::pnbinom(q=fun$y,size=fun$family$getTheta(),prob=predict(fun,type="link"))
+    prob<-stats::pnbinom(q=fun$y,size=exp(fun$family$getTheta()),
+                         mu=predict(fun,type="response"))
     return(prob)
   }
   else {
@@ -1422,6 +1422,7 @@ get.AIC<-function(sem.model,MAG,data){
   return(out)
 }
 
+#' @export
 reorder.MAG<-function(MAG,dep.var.names){
   #Reorders the rows of MAG to agree with the order of the dependent
   #variables listed in dep.var.names
@@ -1518,6 +1519,7 @@ get.LL.of.districts<-function(sem.model,MAG,data){
             fun=in.fun,data=data)
         }
       }
+      if(any(is.na(mat)))return(list(LL=NA,K=NA))
       cor.mat<-stats::cor(mat)
       ncop <- copula::normalCopula(param = cor.mat[upper.tri(cor.mat)],
                                    dim = n.in.mat, dispstr = "un")
@@ -1528,7 +1530,7 @@ get.LL.of.districts<-function(sem.model,MAG,data){
       #set correlation of each fixed element in the correlation matrix to 0
       cor.mat[upper.tri(cor.mat)][fixed.free]<-0
       copula::fixedParam(ncop) <- fixed.free
-      fitC <- fitCopula(copula=ncop,data=mat,method="ml")
+      fitC <- copula::fitCopula(copula=ncop,data=mat,method="ml")
       LL[i]<-stats::logLik(fitC)
       K[i]<-attr(stats::logLik(fitC),which="df")
     }
@@ -2051,7 +2053,7 @@ view.paths<-function(from,to,sem.functions,data,minimum.x=NULL,
 #' MLprobability (maximum likelihood probability)
 #'
 #' @importFrom graphics hist legend lines
-#' @importFrom stats rnorm var dchisq pchisq
+#' @importFrom stats rnorm var dchisq pchisq cor
 #'
 #' @export
 #'
