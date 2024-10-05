@@ -631,6 +631,15 @@ test.dsep.claims<-function(my.list,my.basis.set,data,use.permutations=FALSE,
        correlations.PoR=stats::cor(PoR))
 }
 
+#' Summary Method for pwSEM Class
+#'
+#' Provides a summary for objects of class `pwSEM`.
+#'
+#' @param object An object of class `pwSEM`.
+#' @param structural.equations Logical (TRUE outputs the structural equations)
+#' @param ... other arguments
+#' @return A summary of the pwSEM object.
+#' @method summary pwSEM.class
 #' @export
 summary.pwSEM.class<-function(object,structural.equations=FALSE,...){
   #object is an object produced by pwSEM()
@@ -1451,6 +1460,9 @@ cor.structure.of.district<-function(MAG,vars.in.district){
   return(cor.structure)
 }
 
+#' @importFrom copula normalCopula
+#' @importFrom copula fitCopula
+#' @import copula
 get.LL.of.districts<-function(sem.model,MAG,data){
   #  sem.model is a list containing the structural equations of the m-equivalent
   #  MAG
