@@ -52,7 +52,7 @@ AIC, n.data.lines, use.permutations, n.perms
 \description{
 This function performs a "piecewise" structural equation model without explicit latent variables
 (a "path" model), including with implictly marginalized latents and
-implicitly conditioned latents, based on generalized
+implicitly conditioned latents ("correlated errors"), based on generalized
 linear or additive models, possibly in a mixed model context, and then tests
 the causal structure against an empirical data set using a dsep test.  Therefore, it is able to
 model linear, generalized linear, generalized linear mixed, additive, generalized additive, and

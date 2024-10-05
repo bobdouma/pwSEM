@@ -26,12 +26,13 @@ pwSEM.class<-function(x){
 #use_package("mgcv")
 #use_package("poolr")
 #use_package("copula")
+#use_package("stats")
 
 #This is the code to create the documentation for the function
 #' @title The pwSEM function
 #' @description This function performs a "piecewise" structural equation model without explicit latent variables
 #' (a "path" model), including with implictly marginalized latents and
-#' implicitly conditioned latents, based on generalized
+#' implicitly conditioned latents ("correlated errors"), based on generalized
 #' linear or additive models, possibly in a mixed model context, and then tests
 #' the causal structure against an empirical data set using a dsep test.  Therefore, it is able to
 #' model linear, generalized linear, generalized linear mixed, additive, generalized additive, and
@@ -424,6 +425,13 @@ get.unbiased.sems<-function(sem.functions,mag,equivalent.mag,
     excluded.terms=hold.excluded.terms,residual.values=
     residual.values)
 }
+
+#' updates a gamm4 or gam model by adding the terms in "add.terms"
+#' @param sem.functions a list
+#' @param i a single value indexing the function in sem.functions
+#' @param all.grouping.vars a vector
+#' @param add.terms a vector
+#' @param data a data frame
 #' @export
 update.fun<-function(sem.functions,i,all.grouping.vars,add.terms,data){
   #This function updates a gamm4 or gam model by adding the terms in "add.terms"
@@ -840,7 +848,7 @@ summary.pwSEM.class<-function(object,structural.equations=FALSE,...){
 
 test.latents.same.pair<-function(marginalized.latents,conditioned.latents){
   #This tests if the same pair of observed variables are listed
-  #in both depenent.errors and in conditioned.latents.  If TRUE then
+  #in both dependent.errors and in conditioned.latents.  If TRUE then
   #it returns TRUE and this is an error.
   if(is.null(marginalized.latents) | is.null(conditioned.latents)){
     is.error<-FALSE
@@ -1422,22 +1430,6 @@ get.AIC<-function(sem.model,MAG,data){
   return(out)
 }
 
-#' @export
-reorder.MAG<-function(MAG,dep.var.names){
-  #Reorders the rows of MAG to agree with the order of the dependent
-  #variables listed in dep.var.names
-  new.MAG<-MAG
-  N<-dim(MAG)[1]
-  for(i in 1:N){
-    for(j in 1:N){
-      new.MAG[i,j]<-
-        MAG[dep.var.names[i]==rownames(MAG),dep.var.names[j]==rownames(MAG)]
-    }
-  }
-  dimnames(new.MAG)<-list(dep.var.names,dep.var.names)
-  new.MAG
-}
-
 cor.structure.of.district<-function(MAG,vars.in.district){
   #determines which elements of the correlation matrix of a district
   #will be fixed at zero based on the MAG
@@ -1481,7 +1473,20 @@ get.LL.of.districts<-function(sem.model,MAG,data){
       }
   }
   #MAKE SURE THE ORDER OF VARIABLES IN THE MAG AGREES WITH THOSE IN sem.model!
-  reordered.MAG<-reorder.MAG(MAG=MAG,dep.var.names=dep.var.names)
+#    reordered.MAG<-reorder.MAG(MAG=MAG,dep.var.names=dep.var.names)
+
+  #Reorders the rows of MAG to agree with the order of the dependent
+  #variables listed in dep.var.names
+  reordered.MAG<-MAG
+  N<-dim(MAG)[1]
+  for(i in 1:N){
+    for(j in 1:N){
+      reordered.MAG[i,j]<-
+        MAG[dep.var.names[i]==rownames(MAG),dep.var.names[j]==rownames(MAG)]
+    }
+  }
+  dimnames(reordered.MAG)<-list(dep.var.names,dep.var.names)
+
   var.names<-colnames(reordered.MAG)
   #MAG is the adjacency matrix produced by makeMG
   new.graph<-reordered.MAG
