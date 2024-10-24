@@ -10,6 +10,12 @@ install.packages("devtools")
 
 library(devtools)
 
+# The graph package is no longer on CRAN, but is on BiocManager
+
+install.packages("BiocManager")
+
+BiocManager::install("graph")
+
 # install pwSEM from Bill's GitHub
 install_github("BillShipley/pwSEM",dependencies=TRUE,build_vignettes=TRUE)
 
