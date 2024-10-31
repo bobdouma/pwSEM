@@ -1369,7 +1369,6 @@ prob.distribution.for.copula<-function(fun,data){
        inherits(fun$mer,"glmerMod")){
       fam<-fun$gam$family
     }
-
   if(fam$family=="gaussian"){
     #response scale by default
     prob<-stats::pnorm(q=fun$y,mean=predict(fun),sd=sqrt(summary(fun)$scale))
@@ -1381,7 +1380,6 @@ prob.distribution.for.copula<-function(fun,data){
       return(prob)
     }
   else
-
     if(fam$family=="binomial"){
       #the input vector (Y) is not 0/1
       if(any(fun$weights!=1)){
@@ -1392,19 +1390,33 @@ prob.distribution.for.copula<-function(fun,data){
       return(prob)
     }
   else
-    x<-fun$family
-  x<-substr(x,start=1,stop=17)
-  if(x[1]=="Negative Binomial"){
-    prob<-stats::pnbinom(q=fun$y,size=exp(fun$family$getTheta()),
-                         mu=predict(fun,type="response"))
+  if(fam$family=="gamma"){
+    disp1 <- (fun$scale)
+    prob <- stats::pgamma(fun$y,scale=predict(fun,type="response")*disp1,
+                             shape=1/disp1)
     return(prob)
   }
-  else {
+  else
+  if(fam$family=="beta"){
+    pbeta2 <- function(x, mu, phi, ...) {
+      stats::pbeta(x, shape1 = mu * phi, shape2 = (1 - mu) * phi, ...)}
+
+    prob <- pbeta2(fun$y,mu=predict(fun,type="response"),
+                 phi = exp(fun$family$getTheta()))
+    }
+    else
+     x<-fun$family
+      x<-substr(x,start=1,stop=17)
+      if(x[1]=="Negative Binomial"){
+        prob<-stats::pnbinom(q=fun$y,size=exp(fun$family$getTheta()),
+                           mu=predict(fun,type="response"))
+        return(prob)
+      }
+  else
     print(cat("The AIC function does not support the family:",fam$family))
     #The family isn't supported here, so return NAs
     prob<-rep(NA,length(predict(fun)))
     return(prob)
-  }
 }
 
 get.AIC<-function(sem.model,MAG,data){
