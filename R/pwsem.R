@@ -1390,14 +1390,14 @@ prob.distribution.for.copula<-function(fun,data){
       return(prob)
     }
   else
-  if(fam$family=="gamma"){
-    disp1 <- (fun$scale)
-    prob <- stats::pgamma(fun$y,scale=predict(fun,type="response")*disp1,
+  if(fam$family=="Gamma"){
+    disp <- (fun$scale)
+    prob <- stats::pgamma(fun$y,scale=predict(fun,type="response")*disp,
                              shape=1/disp1)
     return(prob)
   }
   else
-  if(fam$family=="beta"){
+  if(fam$family=="betar"){
     pbeta2 <- function(x, mu, phi, ...) {
       stats::pbeta(x, shape1 = mu * phi, shape2 = (1 - mu) * phi, ...)}
 
